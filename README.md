@@ -2,6 +2,10 @@
 
 **Your neighbours’ bills are the evidence.**
 
+### [Open the live SHARECHECK prototype →](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site)
+
+Public web demo · No sign-up · Synthetic data
+
 A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. All resident records shipped with this demo are synthetic.
 
 ## Run
