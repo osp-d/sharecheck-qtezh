@@ -1,18 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ArrowRight,
-  Check,
-  Copy,
-  Download,
-  FileCheck2,
-  FileText,
-  Info,
-  LockKeyhole,
-  Printer,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight, Copy, Download, Printer } from "lucide-react";
 import {
   FACTORS,
   formatMoney,
@@ -22,10 +11,17 @@ import {
   type Rule,
   type Statement,
 } from "@/lib/audit";
+import {
+  buildingLetter,
+  type DetectiveResult,
+  type VacancyCheckResult,
+} from "@/lib/insights";
 import { managerLetter } from "@/lib/report";
-import { buildingLetter, type DetectiveResult, type VacancyCheckResult } from "@/lib/insights";
 
 type ConclusiveResult = Exclude<AuditResult, { status: "insufficient" }>;
+const panel = "print-card rounded-3xl border border-stroke bg-white p-6 sm:p-8";
+const smallLabel =
+  "text-[10px] font-bold uppercase tracking-[0.16em] text-muted";
 
 export function AuditReport({
   result,
@@ -54,334 +50,294 @@ export function AuditReport({
   verificationBundle: string;
   onVerify: () => void;
 }) {
-  const [letter, setLetter] = useState(() =>
+  const [personalLetter, setPersonalLetter] = useState(() =>
     managerLetter(statement, own, rule, result.consensusCents),
   );
   const [collectiveLetter, setCollectiveLetter] = useState("");
-  const [letterType, setLetterType] = useState<"personal" | "collective">("personal");
-  const activeLetter = letterType === "personal" ? letter : collectiveLetter;
-  function showCollectiveLetter() {
-    if (!collectiveLetter) {
-      setCollectiveLetter(buildingLetter({
-        buildingName: "Maple Court Apartments (DEMO)",
-        period: "October 2026",
-        households: result.residents.length,
-        flaggedCount: result.residents.filter((r) => r.flagged).length,
-        consensusPool: result.consensusCents / 100,
-        formula: formula.status === "found" ? { bases: formula.best.bases, rates: formula.best.rates } : null,
-        vacancy,
-        reportCode,
-      }));
-    }
+  const [letterType, setLetterType] = useState<"personal" | "collective">(
+    "personal",
+  );
+  const activeLetter =
+    letterType === "personal" ? personalLetter : collectiveLetter;
+
+  function openCollective() {
+    if (!collectiveLetter)
+      setCollectiveLetter(
+        buildingLetter({
+          buildingName: "Maple Court Apartments (DEMO)",
+          period: "October 2026",
+          households: result.residents.length,
+          flaggedCount: result.residents.filter((resident) => resident.flagged)
+            .length,
+          consensusPool: result.consensusCents / 100,
+          formula:
+            formula.status === "found"
+              ? { bases: formula.best.bases, rates: formula.best.rates }
+              : null,
+          vacancy,
+          reportCode,
+        }),
+      );
     setLetterType("collective");
   }
-  function downloadLetter() {
+  function download() {
     const url = URL.createObjectURL(
       new Blob([activeLetter], { type: "text/plain;charset=utf-8" }),
     );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = letterType === "personal" ? "sharecheck-personal-letter.txt" : "sharecheck-building-letter.txt";
-    anchor.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `sharecheck-${letterType}-letter.txt`;
+    link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+
   return (
-    <article className={`report ${unlocked ? "unlocked" : "locked"}`}>
-      <div className="report-title-row">
+    <article className="mx-auto max-w-5xl space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <span className="eyebrow">SHARECHECK / BUILDING REPORT / DEMO</span>
-          <h2>Maple Court · October 2026</h2>
-          <p>Water allocation · Synthetic data · {reportCode || "Calculating report code…"}</p>
+          <span className={smallLabel}>Your report · synthetic demo</span>
+          <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+            October water check
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            Maple Court · {reportCode || "Calculating code…"}
+          </p>
         </div>
-        {unlocked ? (
+        {unlocked && (
           <button
-            className="button primary no-print"
+            type="button"
             onClick={() => window.print()}
+            className="no-print inline-flex min-h-11 items-center gap-2 rounded-xl border border-stroke bg-white px-4 text-sm font-semibold"
           >
-            Save as PDF <Printer size={16} />
+            <Printer size={16} /> Save PDF
           </button>
-        ) : (
-          <span className="pill no-print">BASIC RESULT · FREE</span>
         )}
       </div>
-      <section className={`report-summary ${own.flagged ? "flagged" : ""}`}>
-        <span className="pill">
-          {result.status === "inconsistent"
-            ? "INCONSISTENT BUILDING SPLIT"
-            : "CONSISTENT BUILDING SPLIT"}
+
+      <section className={`${panel} print-break-avoid`}>
+        <span
+          className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${own.flagged ? "bg-amber-50 text-amber-800" : "bg-mist text-forest"}`}
+        >
+          {own.flagged ? "Review this charge" : "Within 2% tolerance"}
         </span>
-        <h3>
+        <h3 className="mt-5 font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {own.flagged
-            ? `Your statement is ${formatPercent(Math.abs(own.deviation), 0)} ${own.deviation > 0 ? "above" : "below"} consensus.`
-            : "Your statement is within the 2% tolerance."}
+            ? `${formatMoney(Math.abs(own.differenceCents))} difference`
+            : "Your share looks consistent"}
         </h3>
-        <p>
+        <p className="mt-2 text-sm text-muted">
           {own.flagged
-            ? "This is a discrepancy to investigate, not a determination that money is owed."
-            : "The allocation appears consistent for your statement. The actual building cost still needs supporting evidence."}
+            ? `${formatPercent(Math.abs(own.deviation), 0)} ${own.deviation > 0 ? "above" : "below"} the building consensus. Ask the manager to confirm the inputs.`
+            : "The participating bills point to a similar allocation."}
         </p>
-        <div className="report-metrics">
-          <div>
-            <span>Billed, excluding fee</span>
-            <strong>{formatMoney(statement.utilityCents)}</strong>
-          </div>
-          <ArrowRight size={18} />
-          <div>
-            <span>Expected from consensus</span>
-            <strong>{formatMoney(own.expectedCents)}</strong>
-          </div>
-          <ArrowRight size={18} />
-          <div>
-            <span>
-              {own.differenceCents >= 0 ? "Above consensus" : "Below consensus"}
-            </span>
-            <strong>
-              {formatMoney(Math.abs(own.differenceCents))}
-              <small> / month</small>
-            </strong>
-          </div>
+        <div className="mt-7 grid gap-3 border-t border-stroke pt-5 sm:grid-cols-3">
+          {[
+            ["Billed, before fee", formatMoney(statement.utilityCents)],
+            ["Expected", formatMoney(own.expectedCents)],
+            ["Building pool", formatMoney(result.consensusCents)],
+          ].map(([name, value]) => (
+            <div key={name}>
+              <span className="block text-xs text-muted">{name}</span>
+              <strong className="mt-1 block font-display text-xl tracking-tight">
+                {value}
+              </strong>
+            </div>
+          ))}
         </div>
       </section>
-      <section className="report-code-card no-print">
-        <div><span className="eyebrow">REPRODUCIBLE SNAPSHOT</span><strong>{reportCode || "Calculating…"}</strong><small>Changes to included inputs create a different code.</small></div>
-        <div className="button-row"><button className="button secondary small" disabled={!verificationBundle} onClick={() => void onCopy(verificationBundle)}>Copy verification bundle <Copy size={15} /></button><button className="text-link" onClick={onVerify}>Verify code <ArrowRight size={15} /></button></div>
-      </section>
-      {!unlocked && (
-        <section className="card unlock-card no-print">
-          <span className="icon-tile">
-            <LockKeyhole size={23} />
-          </span>
+
+      <div
+        className={`${panel} no-print flex flex-wrap items-center justify-between gap-3 bg-mist`}
+      >
+        <div>
+          <span className={smallLabel}>Report code</span>
+          <strong className="mt-1 block font-display text-lg">
+            {reportCode || "Calculating…"}
+          </strong>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={!verificationBundle}
+            onClick={() => void onCopy(verificationBundle)}
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold disabled:opacity-40"
+          >
+            <Copy size={14} /> Copy bundle
+          </button>
+          <button
+            type="button"
+            onClick={onVerify}
+            className="inline-flex min-h-10 items-center gap-2 px-2 text-xs font-semibold text-forest"
+          >
+            Verify <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      {!unlocked ? (
+        <section
+          className={`${panel} no-print flex flex-wrap items-center justify-between gap-5`}
+        >
           <div>
-            <span className="eyebrow">TAKE THE NEXT STEP WITH THE NUMBERS</span>
-            <h3>From a result to a useful conversation.</h3>
-            <p>
-              Unlock the full calculation trail, evidence summary, printable
-              report, and an editable letter to your manager.
+            <h3 className="font-display text-lg font-bold">
+              Open the full demo report
+            </h3>
+            <p className="mt-1 text-xs text-muted">
+              Calculation, evidence and editable letters. No payment.
             </p>
-            <div className="button-row">
-              <button className="button primary" onClick={onUnlock}>
-                Unlock full report <ArrowRight size={16} />
-              </button>
-              <span className="small-copy">
-                $9.99 proposed price · free in demo
-              </span>
-            </div>
           </div>
+          <button
+            type="button"
+            onClick={onUnlock}
+            className="min-h-11 rounded-xl bg-forest px-5 text-sm font-semibold text-white hover:bg-ink"
+          >
+            Unlock free report
+          </button>
         </section>
-      )}
-      {unlocked && (
-        <div className="report-details">
-          <section className="card trail-card">
-            <div className="section-title">
-              <h3>Your calculation trail</h3>
-              <span className="pill">
-                <Check size={13} /> REPRODUCIBLE
-              </span>
-            </div>
-            <p className="small-copy">
-              Only your own household’s inputs are shown. Ratios are calculated
-              before rounding amounts to cents.
-            </p>
-            <div className="calculation-steps">
-              <div>
-                <span className="circle-number">1</span>
-                <div>
-                  <h4>Calculate your allocation share</h4>
-                  {FACTORS.filter((factor) => rule.weights[factor] > 0).map(
-                    (factor) => (
-                      <p className="mono" key={factor}>
-                        {formatPercent(rule.weights[factor], 0)} × (
-                        {statement.factors[factor].toLocaleString("en-US")} ÷{" "}
-                        {rule.totals[factor].toLocaleString("en-US")}){" "}
-                        <span className="small-copy">{factor}</span>
-                      </p>
-                    ),
-                  )}
-                  <strong className="calculation-answer">
-                    Combined share = {formatPercent(own.share, 4)}
+      ) : (
+        <>
+          <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+            <section className={panel}>
+              <span className={smallLabel}>Calculation</span>
+              <h3 className="mt-2 font-display text-lg font-bold">
+                Your numbers, step by step
+              </h3>
+              <ol className="mt-5 space-y-4 text-sm">
+                <li className="border-t border-stroke pt-3">
+                  <span className="font-semibold">1. Your share</span>
+                  <div className="mt-1 space-y-1 font-mono text-xs text-muted">
+                    {FACTORS.filter((factor) => rule.weights[factor] > 0).map(
+                      (factor) => (
+                        <div key={factor}>
+                          {formatPercent(rule.weights[factor], 0)} ×{" "}
+                          {statement.factors[factor]} ÷ {rule.totals[factor]}{" "}
+                          <span className="font-sans">{factor}</span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                  <strong className="mt-1 block">
+                    {formatPercent(own.share, 4)}
                   </strong>
-                </div>
-              </div>
-              <div>
-                <span className="circle-number">2</span>
-                <div>
-                  <h4>Work backwards to the implied pool</h4>
-                  <p className="mono">
+                </li>
+                <li className="border-t border-stroke pt-3">
+                  <span className="font-semibold">2. Implied pool</span>
+                  <p className="mt-1 font-mono text-xs text-muted">
                     {formatMoney(statement.utilityCents)} ÷{" "}
-                    {own.share.toFixed(8)} ≈ {formatMoney(own.impliedPoolCents)}
+                    {own.share.toFixed(8)} = {formatMoney(own.impliedPoolCents)}
                   </p>
-                  <p className="small-copy">
-                    The building total implied by your statement.
-                  </p>
-                </div>
-              </div>
-              <div>
-                <span className="circle-number">3</span>
-                <div>
-                  <h4>Compare with the building median</h4>
-                  <p className="mono">
-                    Median of 6 implied pools ={" "}
-                    {formatMoney(result.consensusCents)}
-                  </p>
-                  <p className="small-copy">
-                    Your implied pool differs by{" "}
-                    {formatPercent(Math.abs(own.deviation))}. Differences
-                    greater than 2% are flagged.
-                  </p>
-                </div>
-              </div>
-              <div>
-                <span className="circle-number">4</span>
-                <div>
-                  <h4>Estimate your charge under the consensus</h4>
-                  <p className="mono">
-                    {own.share.toFixed(8)} ×{" "}
+                </li>
+                <li className="border-t border-stroke pt-3">
+                  <span className="font-semibold">3. Expected charge</span>
+                  <p className="mt-1 font-mono text-xs text-muted">
+                    {formatPercent(own.share, 4)} ×{" "}
                     {formatMoney(result.consensusCents)} ≈{" "}
                     {formatMoney(own.expectedCents)}
                   </p>
-                  <strong className="calculation-answer">
-                    Your charge − expected ={" "}
-                    {own.differenceCents < 0 ? "−" : ""}
-                    {formatMoney(Math.abs(own.differenceCents))}
-                  </strong>
-                </div>
-              </div>
-            </div>
-            <div className="info-line">
-              <Info size={16} />
-              <span>
-                The separate {formatMoney(statement.feeCents)} fee is excluded
-                from this comparison.
-                {statement.feeCents !== rule.billingFeeCents
-                  ? ` It differs from the disclosed ${formatMoney(rule.billingFeeCents)} fee; ask the manager to explain.`
-                  : " This check does not establish whether the fee is permitted."}
-              </span>
-            </div>
-          </section>
-          <div className="report-evidence-grid">
-            <section className="card evidence-detail">
-              <FileCheck2 size={22} />
-              <h3>What supports this result</h3>
-              <dl>
-                <div>
-                  <dt>Synthetic document-backed entries</dt>
-                  <dd>{result.documentCount}</dd>
-                </div>
-                <div>
-                  <dt>Self-reported entries</dt>
-                  <dd>{result.selfReportedCount}</dd>
-                </div>
-                <div>
-                  <dt>Same building, month, utility</dt>
-                  <dd>Yes</dd>
-                </div>
-                <div>
-                  <dt>Master bill included</dt>
-                  <dd>{result.masterCheck ? "Demo bill" : "No"}</dd>
-                </div>
-              </dl>
-              <p className="small-copy">
-                Evidence labels describe the synthetic fixtures or local input
-                method. Documents are not independently authenticated.
-              </p>
+                </li>
+              </ol>
             </section>
-            <section className="card evidence-detail">
-              <ShieldCheck size={22} />
-              <h3>
-                {result.masterCheck
-                  ? "Master bill cross-check"
-                  : "What remains unverified"}
+            <section className={panel}>
+              <span className={smallLabel}>Evidence</span>
+              <h3 className="mt-2 font-display text-lg font-bold">
+                What was compared
               </h3>
-              {result.masterCheck ? (
-                <>
-                  <p>
-                    {formatMoney(240000)} × (1 −{" "}
-                    {formatPercent(rule.commonAreaFraction, 0)}) ={" "}
-                    <strong>{formatMoney(result.masterCheck.poolCents)}</strong>
-                  </p>
-                  <p>
-                    {result.masterCheck.matches
-                      ? "The adjusted demo master bill matches the consensus within 2%."
-                      : `The consensus differs from the adjusted demo master bill by ${formatPercent(Math.abs(result.masterCheck.deviation))}. Review the pool and deduction.`}
-                  </p>
-                </>
-              ) : (
-                <p>
-                  The actual building cost and common-area deduction need the
-                  master bill. A consistently inflated pool can pass the
-                  neighbour check.
-                </p>
-              )}
-              <p className="small-copy">
-                The median assumes a majority of entries are reliable. Building
-                totals, occupant counts, and the disclosed formula still need
-                confirmation.
+              <dl className="mt-5 space-y-3 text-sm">
+                {[
+                  ["Households", result.residents.length],
+                  ["Document-backed demo entries", result.documentCount],
+                  ["Self-reported", result.selfReportedCount],
+                  [
+                    "Master bill",
+                    result.masterCheck ? "Included" : "Not included",
+                  ],
+                ].map(([name, value]) => (
+                  <div
+                    key={name}
+                    className="flex justify-between gap-3 border-b border-stroke pb-3"
+                  >
+                    <dt className="text-muted">{name}</dt>
+                    <dd className="font-semibold">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-5 text-xs leading-5 text-muted">
+                The {formatMoney(statement.feeCents)} billing fee is excluded.
+                Documents are not authenticated.
               </p>
             </section>
           </div>
-          <section className="card letter-card">
-            <div className="section-title">
+          <section className={panel}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <span className="eyebrow">A PRACTICAL NEXT STEP</span>
-                <h3>Request the missing pieces.</h3>
+                <span className={smallLabel}>Next step</span>
+                <h3 className="mt-2 font-display text-lg font-bold">
+                  A letter you can edit
+                </h3>
               </div>
-              <FileText size={21} />
+              <div className="no-print inline-flex rounded-xl bg-canvas p-1">
+                <button
+                  type="button"
+                  onClick={() => setLetterType("personal")}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold ${letterType === "personal" ? "bg-white text-forest shadow-sm" : "text-muted"}`}
+                >
+                  Personal
+                </button>
+                <button
+                  type="button"
+                  onClick={openCollective}
+                  disabled={!reportCode || result.residents.length < 3}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-40 ${letterType === "collective" ? "bg-white text-forest shadow-sm" : "text-muted"}`}
+                >
+                  Building
+                </button>
+              </div>
             </div>
-            <div className="segmented-control no-print" role="group" aria-label="Letter type">
-              <button type="button" className={letterType === "personal" ? "selected" : ""} aria-pressed={letterType === "personal"} onClick={() => setLetterType("personal")}>Personal letter</button>
-              <button type="button" className={letterType === "collective" ? "selected" : ""} aria-pressed={letterType === "collective"} onClick={showCollectiveLetter} disabled={result.residents.length < 3 || !reportCode}>Building letter</button>
-            </div>
-            <p className="small-copy no-print">
-              {letterType === "collective" ? `${result.residents.length} participating households · no names or apartment numbers` : "Your own statement only"}. Edit before copying or printing. Nothing is sent.
+            <p className="mt-2 text-xs text-muted">
+              {letterType === "collective"
+                ? `${result.residents.length} households · no names or unit numbers`
+                : "Your own figures only"}
+              . Nothing is sent.
             </p>
-            <label className="visually-hidden" htmlFor="manager-letter">
-              Editable request to property manager
+            <label htmlFor="letter-editor" className="sr-only">
+              Editable manager letter
             </label>
             <textarea
-              id="manager-letter"
-              className="letter-editor no-print"
+              id="letter-editor"
+              rows={14}
               value={activeLetter}
-              onChange={(event) => letterType === "personal" ? setLetter(event.target.value) : setCollectiveLetter(event.target.value)}
-              rows={18}
-              spellCheck
+              onChange={(event) =>
+                letterType === "personal"
+                  ? setPersonalLetter(event.target.value)
+                  : setCollectiveLetter(event.target.value)
+              }
+              className="no-print mt-5 w-full resize-y rounded-xl border border-stroke bg-canvas p-4 text-sm leading-6 focus:border-forest"
             />
-            <div className="printed-letter print-only">{activeLetter}</div>
-            <div className="letter-actions no-print">
+            <div className="print-only hidden mt-5 whitespace-pre-wrap text-sm leading-6">
+              {activeLetter}
+            </div>
+            <div className="no-print mt-3 flex flex-wrap gap-2">
               <button
-                className="button secondary"
+                type="button"
                 onClick={() => void onCopy(activeLetter)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stroke px-4 text-xs font-semibold"
               >
-                Copy letter <Copy size={15} />
+                <Copy size={14} /> Copy
               </button>
-              <button className="text-link" onClick={downloadLetter}>
-                Download text <Download size={15} />
+              <button
+                type="button"
+                onClick={download}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stroke px-4 text-xs font-semibold"
+              >
+                <Download size={14} /> Download
               </button>
             </div>
           </section>
-          <div className="report-disclaimer">
-            <Info size={17} />
-            <p>
-              SHARECHECK provides financial calculations and document
-              organisation, not legal advice. This report uses synthetic demo
-              data. A discrepancy is an estimate to investigate, not proof of
-              unlawful billing or a guaranteed refund.
-            </p>
-          </div>
-          <div className="report-print-actions no-print">
-            <span>
-              Tip: choose “Save as PDF” in your browser’s print dialog.
-            </span>
-            <button className="button primary" onClick={() => window.print()}>
-              Save report as PDF <Printer size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-      {!unlocked && (
-        <p className="print-only">
-          This is the free basic result. Unlock the demo report to include its
-          calculation trail, evidence summary, and manager letter.
-        </p>
+          <p className="text-xs leading-5 text-muted">
+            Synthetic calculations for discussion, not a legal conclusion or
+            guaranteed refund.
+          </p>
+        </>
       )}
     </article>
   );

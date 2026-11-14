@@ -8,6 +8,8 @@ Public web demo · No sign-up · Synthetic data
 
 A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. All resident records shipped with this demo are synthetic.
 
+The interface uses **Tailwind CSS v4** with a small theme and print stylesheet in `src/app/globals.css`.
+
 ## Run
 
 Node.js 22.13 or later is required. Use the committed lockfile.
@@ -41,7 +43,7 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 - Synthetic neighbours added only after explicit demo participation consent.
 - Own statement and aggregate results only; other residents’ rows are never rendered.
 - Evidence provenance, mock paywall, editable manager letter, text download, and print-to-PDF report.
-- October history derived from the result, with November labeled as a sample scenario.
+- A modeled October-to-November explanation appears after the building check.
 - Session reset and withdrawal of demo participation.
 
 Default example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool.
@@ -75,7 +77,8 @@ src/lib/report.ts                Manager-request generation
 src/components/sharecheck-app.tsx Journey state and screens
 src/components/insights-panels.tsx Insight and verification screens
 src/components/report-view.tsx   Calculation, letter, and printable report
-src/app/globals.css              Responsive interface and print styles
+src/app/globals.css              Tailwind import, theme, fonts, print rules
+postcss.config.mjs               Tailwind PostCSS integration
 public/samples/                  Synthetic statement, addendum, master bill
 tests/                          Independent arithmetic and parsing cases
 docs/IMPLEMENTATION_PLAN.md      Scope, milestones, acceptance, release checks

@@ -1,35 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
-  ArrowUpRight,
-  BarChart3,
-  Building2,
   Check,
-  CheckCheck,
-  ChevronRight,
-  CircleHelp,
-  ClipboardCheck,
   Copy,
   Download,
-  FileCheck2,
   FileText,
   Fingerprint,
-  History,
-  Home,
-  Info,
-  Leaf,
-  LockKeyhole,
-  Plus,
   RotateCcw,
   Search,
-  Settings2,
   ShieldCheck,
   Upload,
   Users,
-  X,
-  type LucideIcon,
 } from "lucide-react";
 import {
   buildingCheck,
@@ -41,9 +24,6 @@ import {
   type Statement,
 } from "@/lib/audit";
 import { BUILDING, DEMO_RULE, YOUR_STATEMENT, demoCohort } from "@/lib/demo";
-import { extractPdf } from "@/lib/statement-parser";
-import { BuildingArt } from "./building-art";
-import { AuditReport } from "./report-view";
 import {
   detectFormula,
   explainChange,
@@ -53,19 +33,16 @@ import {
   vacancyCheck,
   type Observation,
 } from "@/lib/insights";
-import { FormulaInsight, VacancyInsight, ChangeInsight, VerifyPage } from "./insights-panels";
+import { extractPdf } from "@/lib/statement-parser";
+import {
+  FormulaInsight,
+  VacancyInsight,
+  ChangeInsight,
+  VerifyPage,
+} from "./insights-panels";
+import { AuditReport } from "./report-view";
 
 type Page = "overview" | "statement" | "formula" | "room" | "report" | "verify";
-type Modal = "method" | "invite" | "pricing" | null;
-const NAV: { id: Page; name: string; short: string; icon: LucideIcon }[] = [
-  { id: "overview", name: "Overview", short: "Home", icon: Home },
-  { id: "statement", name: "Your statement", short: "Bill", icon: FileText },
-  { id: "formula", name: "Building formula", short: "Formula", icon: Settings2 },
-  { id: "room", name: "Building room", short: "Room", icon: Users },
-  { id: "report", name: "Your report", short: "Report", icon: ClipboardCheck },
-  { id: "verify", name: "Verify report", short: "Verify", icon: Fingerprint },
-];
-
 type FieldValues = {
   charge: string;
   fee: string;
@@ -83,11 +60,58 @@ const INITIAL: FieldValues = {
   period: "2026-10",
 };
 const factorNames = {
-  sqft: "Square feet",
+  sqft: "Area",
   occupants: "Occupants",
   bedrooms: "Bedrooms",
   units: "Units",
 };
+const tabs: { id: Page; label: string; short: string }[] = [
+  { id: "overview", label: "Overview", short: "Home" },
+  { id: "statement", label: "Statement", short: "Bill" },
+  { id: "formula", label: "Formula", short: "Formula" },
+  { id: "room", label: "Building room", short: "Room" },
+  { id: "report", label: "Report", short: "Report" },
+  { id: "verify", label: "Verify", short: "Verify" },
+];
+const panel =
+  "rounded-3xl border border-stroke bg-white p-6 shadow-[0_12px_40px_rgba(24,49,38,0.035)] sm:p-8";
+const eyebrow = "text-[10px] font-bold uppercase tracking-[0.18em] text-muted";
+const primary =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-forest px-5 text-sm font-semibold text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:opacity-40";
+const secondary =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-stroke bg-white px-4 text-sm font-semibold transition hover:border-forest disabled:opacity-40";
+
+function Field({
+  label,
+  value,
+  onChange,
+  hint,
+  readOnly = false,
+  inputMode = "decimal",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  hint?: string;
+  readOnly?: boolean;
+  inputMode?: "decimal" | "numeric";
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-2 block text-xs font-semibold text-ink">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={readOnly}
+        inputMode={inputMode}
+        className="min-h-11 w-full rounded-xl border border-stroke bg-white px-3.5 text-sm text-ink outline-none transition focus:border-forest read-only:bg-canvas read-only:text-muted"
+      />
+      {hint && (
+        <span className="mt-1 block text-[11px] text-muted">{hint}</span>
+      )}
+    </label>
+  );
+}
 
 export function SharecheckApp() {
   const [page, setPage] = useState<Page>("overview");
@@ -100,11 +124,12 @@ export function SharecheckApp() {
   const [checked, setChecked] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [master, setMaster] = useState(false);
-  const [formulaMode, setFormulaMode] = useState<"disclosed" | "unknown">("disclosed");
+  const [formulaMode, setFormulaMode] = useState<"disclosed" | "unknown">(
+    "disclosed",
+  );
   const [shiftedVacancies, setShiftedVacancies] = useState(false);
   const [code, setCode] = useState("");
   const [verificationBundle, setVerificationBundle] = useState("");
-  const [modal, setModal] = useState<Modal>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,18 +142,29 @@ export function SharecheckApp() {
   const firstRender = useRef(true);
 
   const cohort = demoCohort(statement, joined);
-  const observations: Observation[] = cohort.map((s) => ({
-    id: s.householdId,
-    unit: s.factors,
-    utilityCharge: s.utilityCents / 100,
+  const observations: Observation[] = cohort.map((item) => ({
+    id: item.householdId,
+    unit: item.factors,
+    utilityCharge: item.utilityCents / 100,
   }));
   const detective = detectFormula(observations);
-  const inferred = detective.status === "found"
-    ? ratesToWeights(detective.best.rates, rule.totals)
-    : null;
-  const effectiveRule: Rule = formulaMode === "unknown" && inferred
-    ? { ...rule, weights: { sqft: 0, occupants: 0, bedrooms: 0, units: 0, ...inferred.weights } }
-    : rule;
+  const inferred =
+    detective.status === "found"
+      ? ratesToWeights(detective.best.rates, rule.totals)
+      : null;
+  const effectiveRule: Rule =
+    formulaMode === "unknown" && inferred
+      ? {
+          ...rule,
+          weights: {
+            sqft: 0,
+            occupants: 0,
+            bedrooms: 0,
+            units: 0,
+            ...inferred.weights,
+          },
+        }
+      : rule;
   const result = buildingCheck({
     buildingId: BUILDING.id,
     period: BUILDING.period,
@@ -138,35 +174,65 @@ export function SharecheckApp() {
   });
   const conclusive = result.status !== "insufficient";
   const own = conclusive
-    ? result.residents.find((r) => r.householdId === "r4")!
+    ? result.residents.find((resident) => resident.householdId === "r4")!
     : null;
   const complete = checked && conclusive;
   const vacancyRule = {
-    components: FACTORS.filter((f) => effectiveRule.weights[f] > 0).map((basis) => ({ basis, weight: effectiveRule.weights[basis] })),
+    components: FACTORS.filter(
+      (factor) => effectiveRule.weights[factor] > 0,
+    ).map((basis) => ({ basis, weight: effectiveRule.weights[basis] })),
     buildingTotals: effectiveRule.totals,
   };
-  const vacantUnits = Array.from({ length: 3 }, () => ({ sqft: 900, occupants: 0, bedrooms: 2, units: 1 }));
-  const eligibleDemoPool = 2400 * (1 - effectiveRule.commonAreaFraction);
-  const simulatedVacancyPool = eligibleDemoPool / (1 - vacantShare(vacancyRule, vacantUnits));
-  const vacancy = complete && conclusive && own
-    ? vacancyCheck({
-        consensusPool: shiftedVacancies ? simulatedVacancyPool : result.consensusCents / 100,
-        masterBill: 2400,
-        commonAreaDeductionPct: effectiveRule.commonAreaFraction,
-        rule: vacancyRule,
-        vacantUnits,
-        yourShare: own.share,
-      })
-    : null;
+  const vacantUnits = Array.from({ length: 3 }, () => ({
+    sqft: 900,
+    occupants: 0,
+    bedrooms: 2,
+    units: 1,
+  }));
+  const simulatedVacancyPool =
+    (2400 * (1 - effectiveRule.commonAreaFraction)) /
+    (1 - vacantShare(vacancyRule, vacantUnits));
+  const vacancy =
+    complete && conclusive && own
+      ? vacancyCheck({
+          consensusPool: shiftedVacancies
+            ? simulatedVacancyPool
+            : result.consensusCents / 100,
+          masterBill: 2400,
+          commonAreaDeductionPct: effectiveRule.commonAreaFraction,
+          rule: vacancyRule,
+          vacantUnits,
+          yourShare: own.share,
+        })
+      : null;
   const currentShare = own?.share ?? 1 / 24;
   const currentPool = conclusive ? result.consensusCents / 100 : 2160;
   const currentCharge = statement.utilityCents / 100;
   const currentFee = statement.feeCents / 100;
   const change = explainChange(
-    { period: "October 2026", share: currentShare, pool: currentPool, charged: currentCharge, fee: currentFee },
-    { period: "November 2026", share: currentShare, pool: currentPool + 240, charged: currentCharge + currentShare * 240 + 12.5, fee: currentFee + 1 },
+    {
+      period: "October 2026",
+      share: currentShare,
+      pool: currentPool,
+      charged: currentCharge,
+      fee: currentFee,
+    },
+    {
+      period: "November 2026",
+      share: currentShare,
+      pool: currentPool + 240,
+      charged: currentCharge + currentShare * 240 + 12.5,
+      fee: currentFee + 1,
+    },
   );
-  const codeSource = JSON.stringify({ statement, rule: effectiveRule, cohort, result: conclusive ? { consensusCents: result.consensusCents, own } : null, formulaMode, shiftedVacancies });
+  const codeSource = JSON.stringify({
+    statement,
+    rule: effectiveRule,
+    cohort,
+    result: conclusive ? { consensusCents: result.consensusCents, own } : null,
+    formulaMode,
+    shiftedVacancies,
+  });
 
   useEffect(() => {
     if (!complete || !conclusive || !own) {
@@ -182,10 +248,16 @@ export function SharecheckApp() {
       viewer: statement,
       rule: effectiveRule,
       consensusCents: result.consensusCents,
-      own: { expectedCents: own.expectedCents, differenceCents: own.differenceCents, deviation: own.deviation },
+      own: {
+        expectedCents: own.expectedCents,
+        differenceCents: own.differenceCents,
+        deviation: own.deviation,
+      },
       households: cohort.length,
       formulaMode,
-      vacancyScenario: shiftedVacancies ? "shifted simulation" : "observed sample",
+      vacancyScenario: shiftedVacancies
+        ? "shifted simulation"
+        : "observed sample",
     };
     void (async () => {
       const cohortFingerprint = await reportCode(cohort);
@@ -193,14 +265,17 @@ export function SharecheckApp() {
       const nextCode = await reportCode(snapshot);
       if (current) {
         setCode(nextCode);
-        setVerificationBundle(JSON.stringify({ code: nextCode, inputs: snapshot }, null, 2));
+        setVerificationBundle(
+          JSON.stringify({ code: nextCode, inputs: snapshot }, null, 2),
+        );
       }
     })();
-    return () => { current = false; };
-  // codeSource captures each input change while avoiding a fresh object dependency on every render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      current = false;
+    };
+    // A stable serialized dependency tracks each input without rerunning for identical render objects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complete, codeSource]);
-
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
@@ -224,7 +299,7 @@ export function SharecheckApp() {
     setUnlocked(false);
   }
   function updateField(key: keyof FieldValues, value: string) {
-    setFields((previous) => ({ ...previous, [key]: value }));
+    setFields((current) => ({ ...current, [key]: value }));
     setSource("manual");
     setConfirmed(false);
     invalidate();
@@ -237,31 +312,25 @@ export function SharecheckApp() {
       Number(fields.charge) <= 0 ||
       Number(fields.charge) > 100000
     )
-      issues.push(
-        "Enter a water charge greater than $0 and no more than $100,000, with up to two decimal places.",
-      );
+      issues.push("Enter a water charge above $0, with up to two decimals.");
     if (!/^\d+(\.\d{1,2})?$/.test(fields.fee) || Number(fields.fee) > 1000)
-      issues.push(
-        "Enter a billing fee between $0 and $1,000, with up to two decimal places.",
-      );
+      issues.push("Enter a fee from $0 to $1,000, with up to two decimals.");
     if (
       !/^\d+$/.test(fields.sqft) ||
       Number(fields.sqft) < 1 ||
       Number(fields.sqft) > 100000
     )
-      issues.push("Enter an apartment area from 1 to 100,000 square feet.");
+      issues.push("Enter an area from 1 to 100,000 sq ft.");
     if (
       !/^\d+$/.test(fields.occupants) ||
       Number(fields.occupants) < 1 ||
       Number(fields.occupants) > 100
     )
-      issues.push("Enter an occupant count from 1 to 100.");
+      issues.push("Enter 1 to 100 occupants.");
     if (!/^\d+$/.test(fields.bedrooms) || Number(fields.bedrooms) > 100)
-      issues.push("Enter a bedroom count from 0 to 100.");
+      issues.push("Enter 0 to 100 bedrooms.");
     if (fields.period !== BUILDING.period)
-      issues.push(
-        "This demo compares October 2026 water statements only. A different month cannot be mixed into this room.",
-      );
+      issues.push("This demo accepts October 2026 statements only.");
     if (issues.length) {
       setErrors(issues);
       return;
@@ -290,7 +359,6 @@ export function SharecheckApp() {
     invalidate();
     try {
       const parsed = await extractPdf(file);
-      // Clear absent fields so values from a previous document cannot appear extracted.
       setFields({
         charge: parsed.utilityDollars?.toFixed(2) ?? "",
         fee: parsed.feeDollars?.toFixed(2) ?? "",
@@ -301,14 +369,12 @@ export function SharecheckApp() {
       });
       setSource("pdf");
       setDocumentName(file.name);
-      setNotice(
-        "Text read locally. Review every field and add any missing values.",
-      );
+      setNotice("PDF text read locally. Review the fields.");
     } catch (error) {
       setErrors([
         error instanceof Error
           ? error.message
-          : "This PDF could not be read. Enter your figures manually.",
+          : "Could not read this PDF. Enter the figures manually.",
       ]);
       setSource("manual");
     } finally {
@@ -323,7 +389,7 @@ export function SharecheckApp() {
     setConfirmed(false);
     setErrors([]);
     invalidate();
-    setNotice("Synthetic sample loaded. Confirm the figures below.");
+    setNotice("Sample loaded. Confirm the figures.");
   }
   function updateRule(next: Rule) {
     setRule(next);
@@ -332,7 +398,7 @@ export function SharecheckApp() {
   function continueFormula(event: React.FormEvent) {
     event.preventDefault();
     const issues = formulaMode === "disclosed" ? validateRule(rule) : [];
-    if (!confirmed) issues.push("Confirm your statement before continuing.");
+    if (!confirmed) issues.push("Confirm your statement first.");
     if (issues.length) {
       setErrors(issues);
       return;
@@ -342,15 +408,15 @@ export function SharecheckApp() {
   function runCheck() {
     if (!confirmed) {
       go("statement");
-      setNotice(
-        "Confirm your statement first so the check uses reviewed figures.",
-      );
+      setNotice("Confirm your statement first.");
       return;
     }
     if (formulaMode === "unknown" && detective.status !== "found") {
-      setErrors([detective.status === "insufficient_data"
-        ? "Formula Detective needs at least 4 participating households."
-        : "No single formula can be inferred from this sample. Review the inputs or add a different mix of households."]);
+      setErrors([
+        detective.status === "insufficient_data"
+          ? "Formula Detective needs 4 households."
+          : "No single formula fits this sample. Review the inputs.",
+      ]);
       return;
     }
     setChecked(true);
@@ -371,530 +437,392 @@ export function SharecheckApp() {
     setSource("sample");
     setErrors([]);
     go("overview");
-    setNotice("Demo reset. All changes from this session have been cleared.");
+    setNotice("Demo reset.");
   }
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setNotice("Copied to clipboard.");
+      setNotice("Copied.");
     } catch {
-      setNotice(
-        "Clipboard is unavailable. Select and copy the text shown in this window.",
-      );
+      setNotice("Clipboard unavailable. Select and copy the text shown.");
     }
   }
-  const headerText: Record<Page, [string, string]> = {
+
+  const pageTitles: Record<Page, [string, string]> = {
     overview: [
-      "Clarity for your shared bills.",
-      "Your neighbours’ bills are the evidence.",
+      "A clearer view of your water bill.",
+      "Check the split with your neighbours’ statements.",
     ],
     statement: [
-      "Let’s start with your statement.",
-      "Review the numbers. Keep your documents private.",
+      "Start with your bill.",
+      "Review the figures used in the check.",
     ],
     formula: [
-      "One building. One formula.",
-      "Use the allocation method disclosed in your utility addendum.",
+      "How is it split?",
+      "Use the disclosed rule or find a likely one.",
     ],
     room: [
-      "Better evidence, together.",
-      "Compare the calculation. Keep your neighbours’ details private.",
+      "Compare as a building.",
+      "Only your row and shared totals are shown.",
     ],
-    report: [
-      "Your numbers. A clearer picture.",
-      "A reproducible calculation and a practical next step.",
-    ],
-    verify: ["Verify a report code.", "Compare a shared snapshot with its fingerprint."],
+    report: ["Your report.", "The calculation and a practical next step."],
+    verify: ["Verify a code.", "Check a shared report snapshot."],
   };
 
   return (
-    <div className="app-shell">
-      <a className="skip-link" href="#main">
+    <div className="min-h-screen bg-canvas font-sans text-ink">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3"
+      >
         Skip to content
       </a>
-      <aside className="sidebar no-print">
-        <button
-          className="wordmark"
-          onClick={() => go("overview")}
-          aria-label="Sharecheck overview"
-        >
-          <Brand />{" "}
-          <span>
-            SHARECHECK<span className="brand-period">.</span>
-          </span>
-        </button>
-        <div className="workspace-label">YOUR WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {NAV.map(({ id, name, short, icon: Icon }) => (
+      <header className="no-print border-b border-stroke bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-8 sm:py-5">
+          <button
+            type="button"
+            onClick={() => go("overview")}
+            className="flex items-center gap-2.5 font-display text-lg font-extrabold tracking-[-0.06em]"
+            aria-label="SHARECHECK home"
+          >
+            <span className="grid size-8 place-items-center rounded-lg bg-forest text-white">
+              <Check size={18} strokeWidth={3} />
+            </span>
+            SHARECHECK<span className="text-forest">.</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-mist px-3 py-1 text-[11px] font-semibold text-forest">
+              Synthetic demo
+            </span>
             <button
-              key={id}
-              className={`nav-item ${page === id ? "active" : ""}`}
-              onClick={() => go(id)}
-              aria-label={name}
-              aria-current={page === id ? "page" : undefined}
+              type="button"
+              onClick={reset}
+              className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink"
             >
-              <Icon size={18} strokeWidth={1.7} />
-              <span className="nav-full">{name}</span><span className="nav-short" aria-hidden="true">{short}</span>
-              {id === "room" && (
-                <span className="nav-count">{joined ? 6 : 1}</span>
-              )}
-              {id === "report" && complete && <span className="nav-dot" />}
+              <RotateCcw size={14} /> Reset
+            </button>
+          </div>
+        </div>
+        <nav
+          aria-label="Main navigation"
+          className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 sm:px-8"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => go(tab.id)}
+              aria-current={page === tab.id ? "page" : undefined}
+              className={`min-h-11 shrink-0 border-b-2 px-2 text-xs font-semibold sm:px-4 ${page === tab.id ? "border-forest text-forest" : "border-transparent text-muted hover:text-ink"}`}
+            >
+              <span className="sm:hidden">{tab.short}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="privacy-note">
-            <ShieldCheck size={23} />
-            <strong>Your bill stays yours.</strong>
-            <p>Only aggregate figures appear in your building room.</p>
-          </div>
-          <button className="subtle-button" onClick={() => setModal("method")}>
-            <CircleHelp size={16} /> How the check works{" "}
-            <ArrowUpRight size={14} />
-          </button>
-          <button className="subtle-button" onClick={reset}>
-            <RotateCcw size={15} /> Reset demo
-          </button>
-          <div className="guest">
-            <span className="avatar">D</span>
-            <div>
-              <strong>Demo guest</strong>
-              <span>No account needed</span>
-            </div>
-            <LockKeyhole size={14} />
-          </div>
-        </div>
-      </aside>
+      </header>
 
-      <div className="workspace">
-        <header className="topbar no-print">
-          <div className="breadcrumbs">
-            <Building2 size={16} />
-            <span>Your building</span>
-            <ChevronRight size={13} />
-            <strong>Maple Court</strong>
-          </div>
-          <div className="topbar-right">
-            <span className="demo-badge">
-              <span /> DEMO WORKSPACE
-            </span>
-            <button
-              className="icon-button"
-              aria-label="About this demo"
-              onClick={() => setModal("method")}
-            >
-              <CircleHelp size={19} />
-            </button>
-          </div>
-        </header>
-        <main id="main" className="main-content">
-          <div className="page-heading no-print">
+      <main
+        id="main"
+        className="mx-auto max-w-6xl px-5 pb-16 pt-9 sm:px-8 sm:pt-12"
+      >
+        {page !== "overview" && (
+          <div className="no-print mb-8 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <div className="eyebrow">
-                {page === "overview"
-                  ? "A LITTLE TRANSPARENCY GOES A LONG WAY"
-                  : `YOUR BUILDING CHECK / ${page.toUpperCase()}`}
-              </div>
-              <h1 ref={titleRef} tabIndex={-1}>
-                {headerText[page][0]}
+              <span className={eyebrow}>Maple Court / October 2026</span>
+              <h1
+                ref={titleRef}
+                tabIndex={-1}
+                className="mt-3 max-w-3xl font-display text-3xl font-extrabold leading-[1.12] tracking-[-0.055em] outline-none sm:text-5xl"
+              >
+                {pageTitles[page][0]}
               </h1>
-              <p>{headerText[page][1]}</p>
+              <p className="mt-3 text-sm text-muted">{pageTitles[page][1]}</p>
             </div>
-            <span className="period">
-              <span className="period-dot" /> October 2026
+            <span className="rounded-full border border-stroke bg-white px-3 py-1 text-xs text-muted">
+              {joined ? 6 : 1} of 24 households
             </span>
           </div>
-          {page !== "overview" && (
-            <div className="stepper no-print" aria-label="Check progress">
-              {(["statement", "formula", "room", "report"] as Page[]).map(
-                (id, index) => (
-                  <button
-                    key={id}
-                    onClick={() => go(id)}
-                    className={page === id ? "current" : ""}
-                    aria-current={page === id ? "step" : undefined}
-                  >
-                    <span>
-                      {(id === "statement" && confirmed) ||
-                      (id === "formula" &&
-                        confirmed &&
-                        ["room", "report"].includes(page)) ||
-                      (id === "room" && complete) ? (
-                        <Check size={13} />
-                      ) : (
-                        index + 1
-                      )}
-                    </span>
-                    {
-                      [
-                        "Your statement",
-                        "The formula",
-                        "Building check",
-                        "Your report",
-                      ][index]
-                    }
-                  </button>
-                ),
-              )}
-            </div>
-          )}
-          {errors.length > 0 && (
-            <div className="error-box no-print" role="alert">
-              <strong>A few details need a second look</strong>
-              <ul>
-                {errors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+        )}
+        {errors.length > 0 && (
+          <div
+            role="alert"
+            className="no-print mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+          >
+            <strong>Check these details</strong>
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              {errors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-          {page === "overview" && (
-            <div className="overview no-print">
-              <section className="hero-card">
-                <div className="hero-copy">
-                  <span className="pill light">
-                    <Leaf size={13} /> MADE FOR RENTERS
-                  </span>
-                  <h2>
-                    Is your water bill
-                    <br />a fair share?
-                  </h2>
-                  <p>
-                    You don’t need the landlord’s master bill to see whether
-                    your building applies the same formula to everyone.
-                  </p>
-                  <button
-                    className="button primary"
-                    onClick={() => go("statement")}
-                  >
-                    Check my building <ArrowRight size={17} />
-                  </button>
-                  <div className="hero-footnote">
-                    <Check size={13} /> Free demo <span>·</span> No sign-up{" "}
-                    <span>·</span> About 2 minutes
-                  </div>
-                </div>
-                <div className="hero-illustration">
-                  <BuildingArt joined={joined} />
-                  <span className="illustration-caption">
-                    MAPLE COURT APARTMENTS <span>DEMO</span>
-                  </span>
-                </div>
-              </section>
-              <div className="section-title">
-                <h2>Your building at a glance</h2>
-                <button className="text-link" onClick={() => go("room")}>
-                  Open building room <ArrowUpRight size={15} />
-                </button>
-              </div>
-              <div className="stats-grid">
-                <Stat
-                  icon={Building2}
-                  label="YOUR BUILDING"
-                  value="Maple Court"
-                  detail="24 apartments · synthetic demo"
-                />
-                <Stat
-                  icon={Users}
-                  label="HOUSEHOLDS PARTICIPATING"
-                  value={
-                    <>
-                      {joined ? "6" : "1"} <small>/ 24</small>
-                    </>
-                  }
-                  detail={
-                    joined
-                      ? "Enough households for a check"
-                      : "At least 3 needed for a check"
-                  }
-                />
-                <Stat
-                  icon={FileCheck2}
-                  label="OCTOBER CHECK"
-                  value={
-                    complete
-                      ? result.status === "inconsistent"
-                        ? "Needs a closer look"
-                        : "Split is consistent"
-                      : "Ready when you are"
-                  }
-                  detail={
-                    complete
-                      ? "View your calculation and next steps"
-                      : "Start with your own statement"
-                  }
-                  compact
-                />
-              </div>
-              <div className="feature-teasers" aria-label="Explore the demo features">
-                <button onClick={() => go("formula")}><Search size={20} /><span><strong>Find the formula</strong><small>Even when it is missing</small></span><ArrowUpRight size={16} /></button>
-                <button onClick={() => go("room")}><Building2 size={20} /><span><strong>Check vacant units</strong><small>See who may bear their share</small></span><ArrowUpRight size={16} /></button>
-                <button onClick={() => go("room")}><History size={20} /><span><strong>Explain a change</strong><small>Follow each dollar</small></span><ArrowUpRight size={16} /></button>
-              </div>
-              <section className="history-strip">
-                <div>
-                  <History size={19} />
-                  <div>
-                    <h3>One check is a start.</h3>
-                    <p>A clearer record, month after month.</p>
-                  </div>
-                </div>
-                <div className="month-cell">
-                  <span>OCT 2026</span>
-                  <strong
-                    className={
-                      complete && result.status === "inconsistent"
-                        ? "text-orange"
-                        : ""
-                    }
-                  >
-                    {complete
-                      ? result.status === "inconsistent"
-                        ? "Review flagged"
-                        : "Consistent"
-                      : "Ready to check"}
-                  </strong>
-                </div>
-                <div className="month-cell muted">
-                  <span>NOV 2026</span>
-                  <strong>Sample scenario</strong>
-                </div>
+        {page === "overview" && (
+          <div className="no-print space-y-5">
+            <section className="relative overflow-hidden rounded-[32px] bg-forest px-7 py-9 text-white sm:px-12 sm:py-14">
+              <div className="relative z-10 max-w-2xl">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
+                  Your bills. One pattern.
+                </span>
+                <h2 className="mt-5 font-display text-4xl font-extrabold leading-[1.08] tracking-[-0.06em] sm:text-6xl">
+                  Is your share
+                  <br />
+                  adding up?
+                </h2>
+                <p className="mt-5 max-w-md text-sm leading-6 text-white/75">
+                  Compare water charges, uncover the formula, and see what to
+                  ask next.
+                </p>
                 <button
-                  className="icon-button"
-                  onClick={() => go(complete ? "report" : "statement")}
-                  aria-label={
-                    complete ? "Open October report" : "Start October check"
-                  }
+                  type="button"
+                  onClick={() => go("statement")}
+                  className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-forest hover:bg-mist"
                 >
-                  <ArrowRight size={19} />
+                  Start the check <ArrowRight size={17} />
                 </button>
-              </section>
+                <p className="mt-4 text-xs text-white/60">
+                  No account · About 2 minutes
+                </p>
+              </div>
+              <div
+                aria-hidden="true"
+                className="absolute -bottom-24 -right-12 size-72 rounded-full border-[55px] border-white/5 sm:-right-4 sm:size-96"
+              />
+            </section>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className={panel}>
+                <span className={eyebrow}>Your sample</span>
+                <strong className="mt-2 block font-display text-2xl font-bold">
+                  {formatMoney(statement.utilityCents)}
+                </strong>
+                <span className="text-xs text-muted">Water charge</span>
+              </div>
+              <div className={panel}>
+                <span className={eyebrow}>Participating</span>
+                <strong className="mt-2 block font-display text-2xl font-bold">
+                  {joined ? 6 : 1} / 24
+                </strong>
+                <span className="text-xs text-muted">Synthetic households</span>
+              </div>
+              <div className={panel}>
+                <span className={eyebrow}>Status</span>
+                <strong className="mt-2 block font-display text-lg font-bold">
+                  {complete
+                    ? own?.flagged
+                      ? "Review flagged"
+                      : "Consistent"
+                    : "Ready to check"}
+                </strong>
+                <button
+                  type="button"
+                  onClick={() => go(complete ? "report" : "room")}
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-forest"
+                >
+                  {complete ? "Open report" : "Open room"}{" "}
+                  <ArrowRight size={13} />
+                </button>
+              </div>
             </div>
-          )}
-
-          {page === "statement" && (
-            <div className="two-column no-print">
-              <form
-                className="card form-card"
-                onSubmit={confirmStatement}
-                noValidate
-              >
-                <div className="card-heading">
-                  <div>
-                    <h2>Your October water statement</h2>
-                    <p>
-                      Use the sample or enter figures for this demo scenario.
-                    </p>
-                  </div>
-                  <span className="pill">DEMO</span>
-                </div>
-                <div className="upload-area">
-                  <Upload size={24} />
-                  <strong>
-                    {loading
-                      ? "Reading PDF text…"
-                      : "Read a PDF, right in your browser"}
-                  </strong>
-                  <p>Text PDFs up to 10 MB. Your file is never uploaded.</p>
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="button secondary small"
-                      onClick={() => fileInput.current?.click()}
-                      disabled={loading}
-                    >
-                      Choose PDF <Plus size={15} />
-                    </button>
-                    <a
-                      href="/samples/maple-court-statement.pdf"
-                      download
-                      className="text-link"
-                    >
-                      Download sample <Download size={14} />
-                    </a>
-                  </div>
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    className="visually-hidden"
-                    aria-label="Choose utility statement PDF"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void readFile(file);
-                    }}
-                  />
-                </div>
-                <div className="source-line">
-                  <FileText size={16} />
-                  <span>
-                    {source === "manual"
-                      ? "Manual entry · self-reported"
-                      : documentName}
-                  </span>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["Find the formula", "formula", Search],
+                ["Check vacant units", "room", ShieldCheck],
+                ["Explain a change", "room", FileText],
+              ].map(([name, target, Icon]) => {
+                const ItemIcon = Icon as typeof Search;
+                return (
                   <button
+                    key={name as string}
                     type="button"
-                    className="text-link"
-                    onClick={loadSample}
-                    disabled={loading}
+                    onClick={() => go(target as Page)}
+                    className="flex min-h-16 items-center gap-3 rounded-2xl border border-stroke bg-white px-5 text-left text-sm font-semibold hover:border-forest"
                   >
-                    Use sample
+                    <ItemIcon size={19} className="text-forest" />
+                    <span className="flex-1">{name as string}</span>
+                    <ArrowRight size={15} className="text-muted" />
                   </button>
-                </div>
-                <div className="divider-label">REVIEW YOUR FIGURES</div>
-                <div className="field-grid">
-                  <Field
-                    label="Water charge"
-                    prefix="$"
-                    value={fields.charge}
-                    onChange={(v) => updateField("charge", v)}
-                    hint="Utility charge only; exclude fees"
-                  />
-                  <Field
-                    label="Separate billing fee"
-                    prefix="$"
-                    value={fields.fee}
-                    onChange={(v) => updateField("fee", v)}
-                  />
-                  <Field
-                    label="Apartment area"
-                    suffix="sq ft"
-                    value={fields.sqft}
-                    onChange={(v) => updateField("sqft", v)}
-                    step="1"
-                  />
-                  <Field
-                    label="Occupants"
-                    value={fields.occupants}
-                    onChange={(v) => updateField("occupants", v)}
-                    step="1"
-                  />
-                  <Field
-                    label="Bedrooms"
-                    value={fields.bedrooms}
-                    onChange={(v) => updateField("bedrooms", v)}
-                    step="1"
-                  />
-                  <label className="field">
-                    <span>Billing month</span>
-                    <input
-                      type="month"
-                      value={fields.period}
-                      onChange={(e) => updateField("period", e.target.value)}
-                      required
-                    />
-                  </label>
-                </div>
-                <div className="info-line">
-                  <Info size={16} />
-                  <span>
-                    Text extraction is a convenience, not verification. Review
-                    every field before continuing.
-                  </span>
-                </div>
-                <div className="form-actions">
-                  <span>
-                    <LockKeyhole size={14} /> This session only
-                  </span>
-                  <button className="button primary" disabled={loading}>
-                    Confirm figures <ArrowRight size={16} />
-                  </button>
-                </div>
-              </form>
-              <aside className="side-notes">
-                <div className="note-block">
-                  <span className="eyebrow">THE SAMPLE STATEMENT</span>
-                  <div className="mini-statement">
-                    <div className="mini-brand">
-                      MAPLE COURT <span>DEMO</span>
-                    </div>
-                    <h3>Water statement</h3>
-                    <p>Billing period: October 2026</p>
-                    <dl>
-                      <div>
-                        <dt>Water charge</dt>
-                        <dd>$112.50</dd>
-                      </div>
-                      <div>
-                        <dt>Billing fee</dt>
-                        <dd>$3.95</dd>
-                      </div>
-                      <div className="total">
-                        <dt>Total billed</dt>
-                        <dd>$116.45</dd>
-                      </div>
-                    </dl>
-                    <div className="sample-stamp">
-                      SYNTHETIC SAMPLE · NO REAL ACCOUNT
-                    </div>
-                  </div>
-                </div>
-                <div className="note-block">
-                  <ShieldCheck size={24} />
-                  <h3>No private details needed.</h3>
-                  <p>
-                    We use financial figures, apartment area, and occupant
-                    counts. We don’t ask for your name or account number.
-                  </p>
-                  <p className="small-copy">
-                    This demo keeps figures in memory and clears them on
-                    refresh. Please use synthetic information.
-                  </p>
-                </div>
-              </aside>
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
 
-          {page === "formula" && (
-            <div className={`two-column no-print ${formulaMode === "unknown" ? "unknown-formula" : ""}`}>
-              <form
-                className="card form-card"
-                onSubmit={continueFormula}
-                noValidate
+        {page === "statement" && (
+          <div className="no-print grid gap-5 lg:grid-cols-[1.4fr_0.6fr]">
+            <form onSubmit={confirmStatement} noValidate className={panel}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className={eyebrow}>1 / Statement</span>
+                  <h2 className="mt-2 font-display text-xl font-bold">
+                    Confirm your figures
+                  </h2>
+                </div>
+                <FileText size={20} className="text-forest" />
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Water charge · $"
+                  value={fields.charge}
+                  onChange={(value) => updateField("charge", value)}
+                />
+                <Field
+                  label="Billing fee · $"
+                  value={fields.fee}
+                  onChange={(value) => updateField("fee", value)}
+                />
+                <Field
+                  label="Apartment · sq ft"
+                  value={fields.sqft}
+                  onChange={(value) => updateField("sqft", value)}
+                  inputMode="numeric"
+                />
+                <Field
+                  label="Occupants"
+                  value={fields.occupants}
+                  onChange={(value) => updateField("occupants", value)}
+                  inputMode="numeric"
+                />
+                <Field
+                  label="Bedrooms"
+                  value={fields.bedrooms}
+                  onChange={(value) => updateField("bedrooms", value)}
+                  inputMode="numeric"
+                />
+                <Field
+                  label="Month"
+                  value={fields.period}
+                  onChange={(value) => updateField("period", value)}
+                  hint="October 2026 only"
+                />
+              </div>
+              <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-6">
+                <span className="text-xs text-muted">
+                  {source === "manual"
+                    ? "Manual entry"
+                    : source === "pdf"
+                      ? `Read from ${documentName}`
+                      : "Synthetic sample"}{" "}
+                  · review required
+                </span>
+                <button type="submit" className={primary}>
+                  Confirm figures <ArrowRight size={16} />
+                </button>
+              </div>
+            </form>
+            <aside className={`${panel} h-fit`}>
+              <span className={eyebrow}>Optional PDF</span>
+              <h3 className="mt-2 font-display text-lg font-bold">
+                Read it locally
+              </h3>
+              <p className="mt-2 text-xs leading-5 text-muted">
+                Text PDFs only. Your file stays in this browser.
+              </p>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                aria-label="Choose a PDF statement"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void readFile(file);
+                }}
+              />
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => fileInput.current?.click()}
+                  className={secondary}
+                >
+                  <Upload size={15} /> {loading ? "Reading…" : "Choose PDF"}
+                </button>
+                <button
+                  type="button"
+                  onClick={loadSample}
+                  className={secondary}
+                >
+                  Use sample
+                </button>
+              </div>
+              <a
+                href="/samples/maple-court-statement.pdf"
+                download
+                className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-forest hover:underline"
               >
-                <div className="card-heading">
-                  <div>
-                    <h2>How is water allocated?</h2>
-                    <p>Use the addendum, or let participating bills reveal a pattern.</p>
-                  </div>
-                  <Settings2 size={21} />
+                Download sample <Download size={14} />
+              </a>
+            </aside>
+          </div>
+        )}
+
+        {page === "formula" && (
+          <form
+            onSubmit={continueFormula}
+            noValidate
+            className={`${panel} no-print mx-auto max-w-4xl`}
+          >
+            <span className={eyebrow}>2 / Formula</span>
+            <h2 className="mt-2 font-display text-xl font-bold">
+              Choose your starting point
+            </h2>
+            <div
+              role="group"
+              aria-label="Formula source"
+              className="mt-5 inline-flex rounded-xl bg-canvas p-1"
+            >
+              <button
+                type="button"
+                aria-pressed={formulaMode === "disclosed"}
+                onClick={() => {
+                  setFormulaMode("disclosed");
+                  invalidate();
+                }}
+                className={`rounded-lg px-4 py-2.5 text-xs font-semibold ${formulaMode === "disclosed" ? "bg-white text-forest shadow-sm" : "text-muted"}`}
+              >
+                Disclosed rule
+              </button>
+              <button
+                type="button"
+                aria-pressed={formulaMode === "unknown"}
+                onClick={() => {
+                  setFormulaMode("unknown");
+                  invalidate();
+                }}
+                className={`rounded-lg px-4 py-2.5 text-xs font-semibold ${formulaMode === "unknown" ? "bg-white text-forest shadow-sm" : "text-muted"}`}
+              >
+                I don’t have it
+              </button>
+            </div>
+            {formulaMode === "unknown" ? (
+              <div className="mt-5">
+                <FormulaInsight
+                  result={detective}
+                  compact={false}
+                  onAdd={() => go("room")}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {FACTORS.filter((factor) => rule.weights[factor] > 0).map(
+                    (factor) => (
+                      <span
+                        key={factor}
+                        className="rounded-full bg-mist px-3 py-1 text-xs font-semibold text-forest"
+                      >
+                        {formatPercent(rule.weights[factor], 0)}{" "}
+                        {factorNames[factor].toLowerCase()}
+                      </span>
+                    ),
+                  )}
                 </div>
-                <div className="segmented-control" role="group" aria-label="Formula source">
-                  <button type="button" className={formulaMode === "disclosed" ? "selected" : ""} aria-pressed={formulaMode === "disclosed"} onClick={() => { setFormulaMode("disclosed"); invalidate(); }}>Disclosed formula</button>
-                  <button type="button" className={formulaMode === "unknown" ? "selected" : ""} aria-pressed={formulaMode === "unknown"} onClick={() => { setFormulaMode("unknown"); invalidate(); }}>I don’t have it</button>
-                </div>
-                {formulaMode === "unknown" && (
-                  <FormulaInsight result={detective} compact={false} onAdd={() => go("room")} />
-                )}
-                {formulaMode === "disclosed" && (<>
-                <div className="formula-preview">
-                  <span className="eyebrow">
-                    YOUR SHARE OF THE BUILDING POOL
-                  </span>
-                  <div>
-                    {FACTORS.filter((f) => rule.weights[f] > 0).map(
-                      (f, index) => (
-                        <span key={f}>
-                          {index > 0 && <b> + </b>}
-                          {formatPercent(rule.weights[f], 0)} ×{" "}
-                          <span className="fraction">
-                            <span>your {factorNames[f].toLowerCase()}</span>
-                            <span>building {factorNames[f].toLowerCase()}</span>
-                          </span>
-                        </span>
-                      ),
-                    )}
-                  </div>
-                </div>
-                <div className="divider-label">
-                  ALLOCATION WEIGHTS · MUST TOTAL 100%
-                </div>
-                <div className="field-grid">
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {FACTORS.map((factor) => (
                     <Field
                       key={factor}
-                      label={factorNames[factor]}
+                      label={`${factorNames[factor]} · %`}
                       value={
                         Number.isFinite(rule.weights[factor])
                           ? String(
@@ -902,862 +830,376 @@ export function SharecheckApp() {
                             )
                           : ""
                       }
-                      suffix="%"
-                      onChange={(v) =>
+                      onChange={(value) =>
                         updateRule({
                           ...rule,
                           weights: {
                             ...rule.weights,
-                            [factor]: v === "" ? NaN : Number(v) / 100,
+                            [factor]: value === "" ? NaN : Number(value) / 100,
                           },
                         })
                       }
                     />
                   ))}
                 </div>
-                <div className="divider-label">BUILDING TOTALS</div>
-                <div className="field-grid">
-                  {FACTORS.map((factor) => (
+                <p className="mt-3 text-xs text-muted">
+                  Weights must total 100%.
+                </p>
+                <details className="mt-6 rounded-2xl border border-stroke p-4">
+                  <summary className="cursor-pointer text-sm font-semibold">
+                    Building totals and fees
+                  </summary>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    {FACTORS.map((factor) => (
+                      <Field
+                        key={factor}
+                        label={`Total ${factorNames[factor].toLowerCase()}`}
+                        value={
+                          Number.isFinite(rule.totals[factor])
+                            ? String(rule.totals[factor])
+                            : ""
+                        }
+                        readOnly={factor === "units"}
+                        inputMode="numeric"
+                        onChange={(value) =>
+                          updateRule({
+                            ...rule,
+                            totals: {
+                              ...rule.totals,
+                              [factor]: value === "" ? NaN : Number(value),
+                            },
+                          })
+                        }
+                      />
+                    ))}
                     <Field
-                      key={factor}
-                      label={`Total ${factorNames[factor].toLowerCase()}`}
-                      readOnly={factor === "units"}
-                      hint={
-                        factor === "units"
-                          ? "Fixed for the 24-unit demo building"
-                          : undefined
-                      }
+                      label="Common-area deduction · %"
                       value={
-                        Number.isFinite(rule.totals[factor])
-                          ? String(rule.totals[factor])
+                        Number.isFinite(rule.commonAreaFraction)
+                          ? String(
+                              Math.round(rule.commonAreaFraction * 10000) / 100,
+                            )
                           : ""
                       }
-                      step="1"
-                      onChange={(v) =>
+                      onChange={(value) =>
                         updateRule({
                           ...rule,
-                          totals: {
-                            ...rule.totals,
-                            [factor]: v === "" ? NaN : Number(v),
-                          },
+                          commonAreaFraction:
+                            value === "" ? NaN : Number(value) / 100,
                         })
                       }
                     />
-                  ))}
-                </div>
-                <div className="divider-label">DEDUCTIONS & FEES</div>
-                <div className="field-grid">
-                  <Field
-                    label="Common-area deduction"
-                    suffix="%"
-                    value={
-                      Number.isFinite(rule.commonAreaFraction)
-                        ? String(
-                            Math.round(rule.commonAreaFraction * 10000) / 100,
-                          )
-                        : ""
-                    }
-                    onChange={(v) =>
-                      updateRule({
-                        ...rule,
-                        commonAreaFraction: v === "" ? NaN : Number(v) / 100,
-                      })
-                    }
-                    hint="Used only when checking a master bill"
-                  />
-                  <Field
-                    label="Disclosed billing fee"
-                    prefix="$"
-                    value={
-                      Number.isFinite(rule.billingFeeCents)
-                        ? String(rule.billingFeeCents / 100)
-                        : ""
-                    }
-                    onChange={(v) =>
-                      updateRule({
-                        ...rule,
-                        billingFeeCents:
-                          v === "" ? NaN : Math.round(Number(v) * 100),
-                      })
-                    }
-                  />
-                </div>
-                </>)}
-                <div className="form-actions">
-                  <button
-                    type="button"
-                    className="text-link"
-                    onClick={() => go("statement")}
-                  >
-                    Back to statement
-                  </button>
-                  <button className="button primary">
-                    {formulaMode === "unknown" ? "Continue to neighbours" : "Continue to building"} <ArrowRight size={16} />
-                  </button>
-                </div>
-              </form>
-              {formulaMode === "disclosed" && <aside className="side-notes">
-                <div className="note-block">
-                  <span className="icon-tile">
-                    <FileCheck2 size={23} />
-                  </span>
-                  <h3>Use the disclosed rule.</h3>
-                  <p>
-                    Allocation rules usually appear in your lease’s utility
-                    addendum. SHARECHECK checks a formula’s application; it
-                    doesn’t decide whether the formula is legally permitted.
-                  </p>
-                  <a
-                    className="text-link"
-                    href="/samples/maple-court-addendum.pdf"
-                    download
-                  >
-                    View demo addendum <Download size={14} />
-                  </a>
-                </div>
-                <div className="note-block tinted">
-                  <h3>Why the totals matter</h3>
-                  <p>
-                    900 square feet is only a share once we know the building
-                    has 21,600 square feet. Missing totals mean no reliable
-                    verdict.
-                  </p>
-                  <p className="small-copy">
-                    Changing the demo formula changes the calculation. The
-                    seeded neighbours’ statements stay the same.
-                  </p>
-                </div>
-                {!confirmed && (
-                  <div className="note-block">
-                    <Info size={20} />
-                    <p>Confirm your statement before continuing.</p>
-                    <button
-                      className="text-link"
-                      onClick={() => go("statement")}
-                    >
-                      Review statement <ArrowRight size={14} />
-                    </button>
-                  </div>
-                )}
-              </aside>}
-            </div>
-          )}
-
-          {page === "room" && (
-            <div className="room-page no-print">
-              <div className="room-grid">
-                <section className="card building-card">
-                  <div className="card-heading">
-                    <div>
-                      <span className="eyebrow">YOUR BUILDING ROOM · DEMO</span>
-                      <h2>Maple Court Apartments</h2>
-                      <p>October 2026 · Water · 24 households</p>
-                    </div>
-                    <span className="icon-tile">
-                      <Building2 size={22} />
-                    </span>
-                  </div>
-                  <div className="participation">
-                    <div className="avatar-stack">
-                      {Array.from({ length: joined ? 6 : 1 }, (_, index) => (
-                        <span key={index}>
-                          <Home size={14} />
-                        </span>
-                      ))}
-                      <span className="avatar-more">+{joined ? 18 : 23}</span>
-                    </div>
-                    <div>
-                      <strong>{joined ? 6 : 1} of 24 households</strong>
-                      <span>
-                        {joined
-                          ? "6 synthetic contributions in this demo"
-                          : "Just your statement for now"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="participation-track">
-                    <span
-                      style={{ width: `${((joined ? 6 : 1) / 24) * 100}%` }}
+                    <Field
+                      label="Disclosed fee · $"
+                      value={
+                        Number.isFinite(rule.billingFeeCents)
+                          ? String(rule.billingFeeCents / 100)
+                          : ""
+                      }
+                      onChange={(value) =>
+                        updateRule({
+                          ...rule,
+                          billingFeeCents:
+                            value === ""
+                              ? NaN
+                              : Math.round(Number(value) * 100),
+                        })
+                      }
                     />
                   </div>
-                  <div className="building-footer">
+                </details>
+                <a
+                  href="/samples/maple-court-addendum.pdf"
+                  download
+                  className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-forest hover:underline"
+                >
+                  Sample addendum <Download size={14} />
+                </a>
+              </>
+            )}
+            <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-6">
+              <button
+                type="button"
+                onClick={() => go("statement")}
+                className="text-xs font-semibold text-muted hover:text-ink"
+              >
+                Back to bill
+              </button>
+              <button type="submit" className={primary}>
+                Continue to room <ArrowRight size={16} />
+              </button>
+            </div>
+          </form>
+        )}
+
+        {page === "room" && (
+          <div className="no-print space-y-5">
+            <section className={panel}>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <span className={eyebrow}>3 / Building room</span>
+                  <h2 className="mt-2 font-display text-xl font-bold">
+                    {joined
+                      ? "Six households in the sample"
+                      : "One bill is not enough"}
+                  </h2>
+                  <p className="mt-2 text-sm text-muted">
+                    {joined
+                      ? "Your figures and building totals only."
+                      : "Add five synthetic neighbours to compare the split."}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-mist px-4 py-3 text-center">
+                  <strong className="block font-display text-2xl">
+                    {joined ? 6 : 1}
+                  </strong>
+                  <span className="text-[11px] text-muted">of 24</span>
+                </div>
+              </div>
+              {!joined ? (
+                <div className="mt-6 border-t border-stroke pt-5">
+                  <label className="flex cursor-pointer items-start gap-3 text-xs leading-5">
+                    <input
+                      type="checkbox"
+                      checked={consent}
+                      onChange={(event) => setConsent(event.target.checked)}
+                      className="mt-0.5 size-4 accent-forest"
+                    />
                     <span>
-                      <ShieldCheck size={15} /> Individual submissions stay
-                      private
+                      I agree to use my figures in this synthetic comparison.
                     </span>
+                  </label>
+                  <div className="mt-5 flex flex-wrap gap-2">
                     <button
-                      className="text-link"
-                      onClick={() => setModal("invite")}
+                      type="button"
+                      disabled={!consent || !confirmed}
+                      onClick={() => {
+                        setJoined(true);
+                        invalidate();
+                        setNotice("Five synthetic neighbours added.");
+                      }}
+                      className={primary}
                     >
-                      Invite neighbours <ArrowUpRight size={14} />
+                      <Users size={16} /> Add demo neighbours
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => go("statement")}
+                      className={secondary}
+                    >
+                      {confirmed ? "Edit my bill" : "Confirm my bill"}
                     </button>
                   </div>
-                  {joined && (
+                </div>
+              ) : (
+                <div className="mt-6 border-t border-stroke pt-5">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={master}
+                        onChange={(event) => {
+                          setMaster(event.target.checked);
+                          invalidate();
+                        }}
+                        className="size-4 accent-forest"
+                      />{" "}
+                      Include $2,400 demo master bill
+                    </label>
+                    <a
+                      href="/samples/maple-court-master-bill.pdf"
+                      download
+                      className="text-xs font-semibold text-forest hover:underline"
+                    >
+                      View bill ↗
+                    </a>
+                  </div>
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
                     <button
-                      className="text-link withdraw-button"
+                      type="button"
+                      onClick={runCheck}
+                      className={primary}
+                    >
+                      {checked ? "Run again" : "Run building check"}{" "}
+                      <ArrowRight size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copy(window.location.href)}
+                      className={secondary}
+                    >
+                      <Copy size={14} /> Copy demo link
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => {
                         setJoined(false);
                         setConsent(false);
                         invalidate();
-                        setNotice(
-                          "Demo participation withdrawn. Your private draft stays in this session; reset to clear all edits.",
-                        );
+                        setNotice("Participation withdrawn from this session.");
                       }}
+                      className="min-h-11 px-2 text-xs font-semibold text-muted hover:text-ink"
                     >
-                      Withdraw demo participation
+                      Withdraw
                     </button>
-                  )}
-                </section>
-                <aside className="card own-summary">
-                  <span className="eyebrow">YOUR CONFIRMED FIGURES</span>
-                  <h3>
-                    {formatMoney(statement.utilityCents)}{" "}
-                    <span>water charge</span>
-                  </h3>
-                  <dl>
-                    <div>
-                      <dt>Your apartment</dt>
-                      <dd>{statement.factors.sqft} sq ft</dd>
-                    </div>
-                    <div>
-                      <dt>Occupants</dt>
-                      <dd>{statement.factors.occupants}</dd>
-                    </div>
-                    <div>
-                      <dt>Billing fee, separate</dt>
-                      <dd>{formatMoney(statement.feeCents)}</dd>
-                    </div>
-                  </dl>
-                  <button className="text-link" onClick={() => go("statement")}>
-                    {confirmed ? "Edit statement" : "Confirm statement first"}{" "}
-                    <ArrowUpRight size={14} />
-                  </button>
-                </aside>
-              </div>
-              {!joined && (
-                <section className="card alone-card">
-                  <span className="icon-tile">
-                    <Users size={24} />
-                  </span>
-                  <div>
-                    <span className="eyebrow">NOT ENOUGH DATA YET</span>
-                    <h2>One statement can’t check a building.</h2>
-                    <p>
-                      We need at least 3 independent households to compare the
-                      implied pool. You can invite neighbours or request the
-                      master bill.
-                    </p>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={consent}
-                        onChange={(e) => setConsent(e.target.checked)}
-                      />
-                      <span>
-                        I agree to contribute my figures to this synthetic
-                        building comparison. Individual rows remain private.
-                      </span>
-                    </label>
-                    <div className="button-row">
-                      <button
-                        className="button primary"
-                        disabled={!consent || !confirmed}
-                        onClick={() => {
-                          setJoined(true);
-                          invalidate();
-                          setNotice(
-                            "Five synthetic neighbour contributions added. No real residents were contacted.",
-                          );
-                        }}
-                      >
-                        Add demo neighbours <Users size={16} />
-                      </button>
-                      <button
-                        className="button secondary"
-                        onClick={() => {
-                          void copy(
-                            "Dear property manager, please share the October 2026 master water bill, the common-area deduction, the disclosed allocation formula and building totals, and the inputs used for my account. Thank you.",
-                          );
-                        }}
-                      >
-                        Copy master bill request <Copy size={15} />
-                      </button>
-                    </div>
                   </div>
-                </section>
-              )}
-              {joined && (
-                <section className="card check-card">
-                  <div className="section-title">
-                    <div>
-                      <span className="eyebrow">
-                        BUILDING CONSISTENCY CHECK
-                      </span>
-                      <h2>Different apartments. The same building pool?</h2>
-                    </div>
-                    <span className="pill green">
-                      <Check size={13} /> Minimum reached
-                    </span>
-                  </div>
-                  <p>
-                    Each statement points back to a building total. We compare
-                    those totals using the median, then flag differences greater
-                    than 2%.
+                  <p className="mt-3 text-[11px] text-muted">
+                    Demo links open independent sessions; no real invitation is
+                    sent.
                   </p>
-                  <div className="evidence-strip">
-                    <span>
-                      <FileCheck2 size={18} />
-                      <strong>
-                        {conclusive
-                          ? result.documentCount
-                          : demoCohort(statement, joined).filter(
-                              (s) => s.evidence === "document-attached",
-                            ).length}
-                      </strong>{" "}
-                      document-backed demo entries
-                    </span>
-                    <span>
-                      <FileText size={18} />
-                      <strong>
-                        {conclusive
-                          ? result.selfReportedCount
-                          : demoCohort(statement, joined).filter(
-                              (s) => s.evidence === "self-reported",
-                            ).length}
-                      </strong>{" "}
-                      self-reported
-                    </span>
-                    <button
-                      className="text-link"
-                      onClick={() => setModal("method")}
-                    >
-                      What this means <Info size={14} />
-                    </button>
-                  </div>
-                  <label className="checkbox-label master-toggle">
-                    <input
-                      type="checkbox"
-                      checked={master}
-                      onChange={(e) => {
-                        setMaster(e.target.checked);
-                        invalidate();
-                      }}
-                    />
-                    <span>
-                      Include the demo master bill: <strong>$2,400.00</strong>{" "}
-                      before common areas
-                    </span>
-                  </label>
-                  <a
-                    className="text-link"
-                    href="/samples/maple-court-master-bill.pdf"
-                    download
-                  >
-                    View sample master bill <Download size={14} />
-                  </a>
-                  <div className="form-actions">
-                    <span className="small-copy">
-                      Your neighbours’ statements are not displayed.
-                    </span>
-                    <button className="button primary" onClick={runCheck}>
-                      {checked ? "Run check again" : "Run building check"}{" "}
-                      <ArrowRight size={16} />
-                    </button>
-                  </div>
-                </section>
-              )}
-              {checked && result.status === "insufficient" && (
-                <div className="error-box" role="status">
-                  <h3>Not enough reliable data for a verdict.</h3>
-                  <ul>
-                    {result.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                  <button className="text-link" onClick={() => go("formula")}>
-                    Review formula <ArrowRight size={15} />
-                  </button>
                 </div>
               )}
-              {complete && own && conclusive && (
+            </section>
+            {joined && (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <FormulaInsight
+                  result={detective}
+                  compact
+                  onAdd={() => go("formula")}
+                />
+                {complete && vacancy && (
+                  <VacancyInsight
+                    result={vacancy}
+                    shifted={shiftedVacancies}
+                    onToggle={() => setShiftedVacancies((current) => !current)}
+                  />
+                )}
+              </div>
+            )}
+            {checked && result.status === "insufficient" && (
+              <div
+                role="status"
+                className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
+              >
+                <strong>More information is needed.</strong>
+                <ul className="mt-2 list-inside list-disc">
+                  {result.reasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {complete && own && conclusive && (
+              <>
                 <section
-                  className={`result-card ${result.status === "consistent" ? "consistent" : ""}`}
                   role="status"
+                  className="rounded-3xl bg-forest p-7 text-white sm:p-9"
                 >
-                  <div className="result-top">
-                    <span className="pill">
-                      <span className="status-dot" />{" "}
-                      {result.status === "inconsistent"
-                        ? "INCONSISTENT BUILDING SPLIT"
-                        : "CONSISTENT BUILDING SPLIT"}
-                    </span>
-                    <span className="small-copy">
-                      6 households · October 2026 · DEMO
-                    </span>
-                  </div>
-                  <div className="result-body">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">
+                    Your result
+                  </span>
+                  <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
                     <div>
-                      <h2>
-                        {own.flagged ? (
-                          <>
-                            Your charge is{" "}
-                            {formatPercent(Math.abs(own.deviation), 0)}{" "}
-                            {own.deviation > 0 ? "above" : "below"}
-                            <br />
-                            the building consensus.
-                          </>
-                        ) : (
-                          <>
-                            Your charge matches
-                            <br />
-                            the building consensus.
-                          </>
-                        )}
-                      </h2>
-                      <p>
+                      <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
                         {own.flagged
-                          ? "The formula points to a different charge. Ask your manager to confirm the inputs used for your account."
-                          : result.status === "inconsistent"
-                            ? "Your own statement is within tolerance; the building comparison found a discrepancy in the sample."
-                            : "The same disclosed formula appears to have been applied consistently across the sample."}
+                          ? `${formatMoney(Math.abs(own.differenceCents))} difference`
+                          : "Your charge matches"}
+                      </h2>
+                      <p className="mt-2 max-w-lg text-sm text-white/70">
+                        {own.flagged
+                          ? `${formatPercent(Math.abs(own.deviation), 0)} ${own.deviation > 0 ? "above" : "below"} the building consensus.`
+                          : "Within the 2% comparison tolerance."}
                       </p>
                     </div>
-                    <div className="difference-metric">
-                      <span>
-                        {own.flagged
-                          ? "YOUR ESTIMATED MONTHLY DIFFERENCE"
-                          : "YOUR EXPECTED UTILITY CHARGE"}
-                      </span>
-                      <strong>
-                        {formatMoney(
-                          own.flagged
-                            ? Math.abs(own.differenceCents)
-                            : own.expectedCents,
-                        )}
-                      </strong>
-                      <small>
-                        {own.flagged && own.differenceCents > 0
-                          ? `${formatMoney(own.differenceCents * 12)} a year if the difference continues`
-                          : "Based on participating households, excluding fees"}
-                      </small>
-                    </div>
-                  </div>
-                  <div className="result-calculation">
-                    <div>
-                      <span>Your utility charge</span>
-                      <strong>{formatMoney(statement.utilityCents)}</strong>
-                    </div>
-                    <ArrowRight size={18} />
-                    <div>
-                      <span>Expected from consensus</span>
-                      <strong>{formatMoney(own.expectedCents)}</strong>
-                    </div>
-                    <ArrowRight size={18} />
-                    <div>
-                      <span>Median building pool</span>
-                      <strong>{formatMoney(result.consensusCents)}</strong>
-                    </div>
-                  </div>
-                  <div className="result-bottom">
-                    <p>
-                      <Info size={16} />{" "}
-                      {result.masterCheck
-                        ? result.masterCheck.matches
-                          ? "The demo master bill also supports this building pool."
-                          : "The demo master bill does not match the consensus pool. Review both."
-                        : "The master bill is still needed to verify the building total."}
-                    </p>
                     <button
-                      className="button primary"
+                      type="button"
                       onClick={() => go("report")}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-forest"
                     >
-                      See your report <ArrowRight size={16} />
+                      Open report <ArrowRight size={16} />
                     </button>
                   </div>
+                  <div className="mt-7 grid gap-4 border-t border-white/20 pt-5 text-xs sm:grid-cols-3">
+                    {[
+                      ["Your charge", formatMoney(statement.utilityCents)],
+                      ["Expected", formatMoney(own.expectedCents)],
+                      ["Median pool", formatMoney(result.consensusCents)],
+                    ].map(([name, value]) => (
+                      <div key={name}>
+                        <span className="text-white/60">{name}</span>
+                        <strong className="mt-1 block font-display text-lg">
+                          {value}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
                 </section>
-              )}
-              {joined && (
-                <div className="insight-grid">
-                  <FormulaInsight result={detective} compact onAdd={() => go("formula")} />
-                  {complete && vacancy && own && (
-                    <VacancyInsight
-                      result={vacancy}
-                      shifted={shiftedVacancies}
-                      onToggle={() => setShiftedVacancies((value) => !value)}
-                    />
-                  )}
-                </div>
-              )}
-              {complete && <ChangeInsight result={change} />}
-              <section className="card next-month">
-                <History size={21} />
-                <div>
-                  <h3>Your building’s story, month by month.</h3>
-                  <p>
-                    October:{" "}
-                    {complete
-                      ? result.status === "inconsistent"
-                        ? "review flagged"
-                        : "consistent split"
-                      : "check pending"}{" "}
-                    <span>·</span> November: sample scenario available below
-                  </p>
-                </div>
-                <span className="pill">SYNTHETIC HISTORY</span>
-              </section>
-            </div>
-          )}
-
-          {page === "verify" && (
-            <VerifyPage onCopy={copy} initialBundle={verificationBundle} />
-          )}
-
-          {page === "report" && !complete && (
-            <div className="card empty-state no-print">
-              <ClipboardCheck size={34} />
-              <h2>A good report starts with enough evidence.</h2>
-              <p>
-                Confirm your statement, review the formula, and run the building
-                check. There’s no paid report for an inconclusive result.
-              </p>
-              <button
-                className="button primary"
-                onClick={() => go(confirmed ? "room" : "statement")}
-              >
-                Continue your check <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
-          {complete && own && conclusive && (
-            <div className={page === "report" ? "" : "print-only"}>
-              <AuditReport
-                key={JSON.stringify({ statement, rule: effectiveRule, master, formulaMode, shiftedVacancies })}
-                result={result}
-                own={own}
-                statement={statement}
-                rule={effectiveRule}
-                unlocked={unlocked}
-                onUnlock={() => setModal("pricing")}
-                onCopy={copy}
-                formula={detective}
-                vacancy={shiftedVacancies ? null : vacancy}
-                reportCode={code}
-                verificationBundle={verificationBundle}
-                onVerify={() => go("verify")}
-              />
-            </div>
-          )}
-          <footer className="page-footer no-print">
-            <span>
-              <Brand small /> SHARECHECK
-            </span>
-            <p>
-              Financial calculations and document organisation, not legal
-              advice.
-            </p>
-            <span className="footer-demo">
-              DEMO · Synthetic data · Resets on refresh
-            </span>
-          </footer>
-        </main>
-      </div>
-      <div className="toast" role="status" aria-live="polite">
-        {notice && (
-          <span>
-            <CheckCheck size={17} />
-            {notice}
-          </span>
+                <ChangeInsight result={change} />
+              </>
+            )}
+          </div>
         )}
-      </div>
-      {modal && (
-        <ModalShell
-          title={
-            modal === "method"
-              ? "A transparent check, with clear limits."
-              : modal === "invite"
-                ? "Evidence is better together."
-                : "A clear result before a paid report."
-          }
-          onClose={() => setModal(null)}
+
+        {page === "report" &&
+          (!complete || !own || !conclusive ? (
+            <section
+              className={`${panel} no-print mx-auto max-w-2xl text-center`}
+            >
+              <Fingerprint size={30} className="mx-auto text-forest" />
+              <h2 className="mt-4 font-display text-xl font-bold">
+                Your report starts with a check
+              </h2>
+              <p className="mt-2 text-sm text-muted">
+                Confirm the bill, add neighbours and run the comparison.
+              </p>
+              <button
+                type="button"
+                onClick={() => go(confirmed ? "room" : "statement")}
+                className={`${primary} mt-6`}
+              >
+                Continue <ArrowRight size={16} />
+              </button>
+            </section>
+          ) : (
+            <AuditReport
+              key={JSON.stringify({
+                statement,
+                rule: effectiveRule,
+                master,
+                formulaMode,
+                shiftedVacancies,
+              })}
+              result={result}
+              own={own}
+              statement={statement}
+              rule={effectiveRule}
+              unlocked={unlocked}
+              onUnlock={() => setUnlocked(true)}
+              onCopy={copy}
+              formula={detective}
+              vacancy={shiftedVacancies ? null : vacancy}
+              reportCode={code}
+              verificationBundle={verificationBundle}
+              onVerify={() => go("verify")}
+            />
+          ))}
+        {page === "verify" && (
+          <VerifyPage initialBundle={verificationBundle} onCopy={copy} />
+        )}
+        <footer className="no-print mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-6 text-[11px] text-muted">
+          <span>SHARECHECK · Synthetic demo</span>
+          <details className="max-w-xl">
+            <summary className="cursor-pointer font-semibold text-forest">
+              How this works
+            </summary>
+            <p className="mt-2 leading-5">
+              We compare each household’s implied building pool using the
+              median. A difference above 2% is flagged. A consistent split does
+              not authenticate bills or prove the building total is right.
+            </p>
+          </details>
+          <span>Calculations, not legal advice</span>
+        </footer>
+      </main>
+      {notice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="no-print fixed bottom-5 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl bg-ink px-4 py-3 text-xs font-semibold text-white shadow-xl"
         >
-          {modal === "method" && (
-            <div className="method-content">
-              <span className="pill">ABOUT THIS DEMO</span>
-              <h3>Every statement implies a building pool.</h3>
-              <p>
-                First, calculate each household’s weighted share. Divide its
-                utility charge by that share, then take the median of those
-                implied building pools. A difference greater than 2% is flagged.
-              </p>
-              <div className="method-equation">
-                Utility charge ÷ allocation share = implied pool
-              </div>
-              <h3>Consistency is one piece of evidence.</h3>
-              <p>
-                We need at least 3 independent households with the same month,
-                utility, building, and formula. An evenly inflated building pool
-                can pass this check. A master bill is needed to check the actual
-                total. If half or more of the entries are wrong, the median can
-                be misleading.
-              </p>
-              <h3>Documents are supporting evidence, not verification.</h3>
-              <p>
-                “Document-backed” means a synthetic sample document supports the
-                fixture, or a PDF was read locally. It does not mean the
-                contents have been independently authenticated. Editing a figure
-                marks your entry as self-reported.
-              </p>
-              <h3>Your privacy in this prototype</h3>
-              <p>
-                Files are processed in your browser. No files or figures are
-                sent to a server or saved to browser storage. Only your row and
-                aggregate results appear. Reset or refresh to erase this
-                session. Live multi-user rooms, identity checks, and private
-                document storage belong to the pilot phase.
-              </p>
-            </div>
-          )}
-          {modal === "invite" && (
-            <div className="method-content">
-              <span className="icon-tile">
-                <Users size={25} />
-              </span>
-              <p>
-                Invite at least two neighbours to compare the same month’s
-                shared water allocation.
-              </p>
-              <label className="field">
-                <span>Demo room link</span>
-                <input
-                  readOnly
-                  value={
-                    typeof window === "undefined"
-                      ? ""
-                      : `${window.location.origin}/#demo-room`
-                  }
-                  onFocus={(e) => e.target.select()}
-                />
-              </label>
-              <button
-                className="button primary"
-                onClick={() =>
-                  void copy(`${window.location.origin}/#demo-room`)
-                }
-              >
-                Copy demo link <Copy size={16} />
-              </button>
-              <div className="info-line">
-                <Info size={17} />
-                <span>
-                  This shares the demo app. Each visitor gets an independent
-                  synthetic session; it is not a live shared room.
-                </span>
-              </div>
-              <p className="small-copy">
-                The prototype never sends emails or contacts residents.
-              </p>
-            </div>
-          )}
-          {modal === "pricing" && (
-            <div className="method-content">
-              <span className="pill">MOCK CHECKOUT · NO PAYMENT</span>
-              <p>
-                Basic results and contributions stay free. A full report is
-                offered only after a conclusive building check.
-              </p>
-              <div className="pricing-grid">
-                <div className="price-card selected">
-                  <span>BUILDING REPORT</span>
-                  <strong>
-                    $9.99<small> one time</small>
-                  </strong>
-                  <p>
-                    Calculation trail, evidence summary, printable report, and a
-                    manager letter.
-                  </p>
-                </div>
-                <div className="price-card">
-                  <span>LEASE PASS</span>
-                  <strong>
-                    $29<small> / 12 months</small>
-                  </strong>
-                  <p>
-                    Proposed monthly re-checks, history, and alerts. Pilot
-                    feature.
-                  </p>
-                </div>
-              </div>
-              <button
-                className="button primary full"
-                onClick={() => {
-                  setUnlocked(true);
-                  setModal(null);
-                  setNotice(
-                    "Demo report unlocked for free. No payment was taken.",
-                  );
-                }}
-              >
-                Unlock report — free in demo <ArrowRight size={17} />
-              </button>
-              <p className="small-copy">
-                Pricing is a hypothesis to test. This demo has no billing or
-                subscription service.
-              </p>
-            </div>
-          )}
-        </ModalShell>
+          {notice}
+        </div>
       )}
     </div>
-  );
-}
-
-export function Brand({ small = false }: { small?: boolean }) {
-  return (
-    <svg
-      width={small ? 17 : 26}
-      height={small ? 17 : 26}
-      viewBox="0 0 28 28"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect x="2" y="2" width="10" height="10" rx="2" fill="currentColor" />
-      <rect x="16" y="2" width="10" height="10" rx="2" fill="currentColor" />
-      <rect x="2" y="16" width="10" height="10" rx="2" fill="currentColor" />
-      <path
-        d="m16 21 4 4 7-9"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-function Stat({
-  icon: Icon,
-  label,
-  value,
-  detail,
-  compact,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: ReactNode;
-  detail: string;
-  compact?: boolean;
-}) {
-  return (
-    <section className="card stat-card">
-      <div>
-        <span className="label">{label}</span>
-        <Icon size={18} strokeWidth={1.5} />
-      </div>
-      <strong className={compact ? "compact-value" : ""}>{value}</strong>
-      <p>
-        <span className="stat-dot" />
-        {detail}
-      </p>
-    </section>
-  );
-}
-function HowStep({
-  number,
-  icon: Icon,
-  title,
-  text,
-}: {
-  number: string;
-  icon: LucideIcon;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="how-step">
-      <div>
-        <span className="icon-tile">
-          <Icon size={21} strokeWidth={1.6} />
-        </span>
-        <span className="step-number">{number}</span>
-      </div>
-      <h3>{title}</h3>
-      <p>{text}</p>
-    </div>
-  );
-}
-function Field({
-  label,
-  value,
-  onChange,
-  prefix,
-  suffix,
-  hint,
-  readOnly = false,
-  step = "0.01",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  prefix?: string;
-  suffix?: string;
-  hint?: string;
-  readOnly?: boolean;
-  step?: string;
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <div className="input-wrap">
-        {prefix && <span>{prefix}</span>}
-        <input
-          type="number"
-          min="0"
-          step={step}
-          value={value}
-          readOnly={readOnly}
-          onChange={(event) => onChange(event.target.value)}
-          required
-          inputMode={step === "1" ? "numeric" : "decimal"}
-        />
-        {suffix && <span>{suffix}</span>}
-      </div>
-      {hint && <small>{hint}</small>}
-    </label>
-  );
-}
-function ModalShell({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    ref.current?.showModal();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className="modal"
-      onCancel={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      aria-labelledby="modal-title"
-    >
-      <div className="modal-header">
-        <h2 id="modal-title">{title}</h2>
-        <button
-          className="icon-button"
-          aria-label="Close dialog"
-          onClick={onClose}
-        >
-          <X size={20} />
-        </button>
-      </div>
-      {children}
-    </dialog>
   );
 }

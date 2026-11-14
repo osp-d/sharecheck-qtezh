@@ -22,6 +22,8 @@ flowchart LR
 
 No record is sent to a backend. No session is stored in localStorage, cookies, or an external database. Third-party fonts are self-hosted. Dependency downloads occur at build time. The static host will still receive ordinary requests for app assets; this is not a claim of anonymous network access.
 
+The interface uses Tailwind CSS utilities in the React components. `globals.css` contains only the Tailwind import, self-hosted fonts, theme tokens, focus styles, and print rules. The six views use a compact header and reveal detailed calculations only in the report.
+
 The client contains all synthetic fixtures. UI privacy in a demo does **not** provide confidentiality for real residents. A production implementation must move the cohort and calculation to an authorized server.
 
 ## Calculation contract
