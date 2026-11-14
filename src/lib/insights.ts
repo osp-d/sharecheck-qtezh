@@ -128,7 +128,8 @@ export function ratesToWeights(rates: Record<string, number>, buildingTotals: Pa
   if (!Number.isFinite(pool) || pool <= 0) return null;
   return {
     impliedPool: round2(pool),
-    weights: Object.fromEntries(parts.map(([b, v]) => [b, Math.round((v / pool) * 1000) / 1000])),
+    // Keep full precision for downstream allocation checks; round only in the UI.
+    weights: Object.fromEntries(parts.map(([b, v]) => [b, v / pool])),
   };
 }
 

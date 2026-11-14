@@ -49,6 +49,7 @@ import {
   explainChange,
   ratesToWeights,
   reportCode,
+  vacantShare,
   vacancyCheck,
   type Observation,
 } from "@/lib/insights";
@@ -140,16 +141,20 @@ export function SharecheckApp() {
     ? result.residents.find((r) => r.householdId === "r4")!
     : null;
   const complete = checked && conclusive;
+  const vacancyRule = {
+    components: FACTORS.filter((f) => effectiveRule.weights[f] > 0).map((basis) => ({ basis, weight: effectiveRule.weights[basis] })),
+    buildingTotals: effectiveRule.totals,
+  };
+  const vacantUnits = Array.from({ length: 3 }, () => ({ sqft: 900, occupants: 0, bedrooms: 2, units: 1 }));
+  const eligibleDemoPool = 2400 * (1 - effectiveRule.commonAreaFraction);
+  const simulatedVacancyPool = eligibleDemoPool / (1 - vacantShare(vacancyRule, vacantUnits));
   const vacancy = complete && conclusive && own
     ? vacancyCheck({
-        consensusPool: shiftedVacancies ? 2304 : result.consensusCents / 100,
+        consensusPool: shiftedVacancies ? simulatedVacancyPool : result.consensusCents / 100,
         masterBill: 2400,
         commonAreaDeductionPct: effectiveRule.commonAreaFraction,
-        rule: {
-          components: FACTORS.filter((f) => effectiveRule.weights[f] > 0).map((basis) => ({ basis, weight: effectiveRule.weights[basis] })),
-          buildingTotals: effectiveRule.totals,
-        },
-        vacantUnits: Array.from({ length: 3 }, () => ({ sqft: 900, occupants: 0, bedrooms: 2, units: 1 })),
+        rule: vacancyRule,
+        vacantUnits,
         yourShare: own.share,
       })
     : null;

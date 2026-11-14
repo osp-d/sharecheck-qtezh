@@ -52,6 +52,12 @@ test("F1 turns rates back into the lease-style 50/50 split when totals are known
   });
 });
 
+test("F1 keeps inferred weights precise enough to sum to one", () => {
+  const inferred = ratesToWeights({ sqft: 0.071, occupants: 19.17 }, RULE.buildingTotals);
+  assert.ok(inferred);
+  assert.ok(Math.abs(Object.values(inferred.weights).reduce((sum, weight) => sum + weight, 0) - 1) < 1e-12);
+});
+
 test("F1 prefers the simpler formula when it fits", () => {
   const perOccupant = DEMO.map((o) => ({ ...o, utilityCharge: 40 * o.unit.occupants }));
   const r = detectFormula(perOccupant);
