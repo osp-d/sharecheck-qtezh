@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+coverage/
+public/pdf.worker.min.mjs
+public/pdf-fonts/
