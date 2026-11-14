@@ -23,6 +23,7 @@ import {
   LockKeyhole,
   Plus,
   RotateCcw,
+  Search,
   Settings2,
   ShieldCheck,
   Upload,
@@ -43,8 +44,17 @@ import { BUILDING, DEMO_RULE, YOUR_STATEMENT, demoCohort } from "@/lib/demo";
 import { extractPdf } from "@/lib/statement-parser";
 import { BuildingArt } from "./building-art";
 import { AuditReport } from "./report-view";
+import {
+  detectFormula,
+  explainChange,
+  ratesToWeights,
+  reportCode,
+  vacancyCheck,
+  type Observation,
+} from "@/lib/insights";
+import { FormulaInsight, VacancyInsight, ChangeInsight, VerifyPage } from "./insights-panels";
 
-type Page = "overview" | "statement" | "formula" | "room" | "report";
+type Page = "overview" | "statement" | "formula" | "room" | "report" | "verify";
 type Modal = "method" | "invite" | "pricing" | null;
 const NAV: { id: Page; name: string; icon: LucideIcon }[] = [
   { id: "overview", name: "Overview", icon: Home },
@@ -52,6 +62,7 @@ const NAV: { id: Page; name: string; icon: LucideIcon }[] = [
   { id: "formula", name: "Building formula", icon: Settings2 },
   { id: "room", name: "Building room", icon: Users },
   { id: "report", name: "Your report", icon: ClipboardCheck },
+  { id: "verify", name: "Verify report", icon: Fingerprint },
 ];
 
 type FieldValues = {
@@ -88,6 +99,10 @@ export function SharecheckApp() {
   const [checked, setChecked] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [master, setMaster] = useState(false);
+  const [formulaMode, setFormulaMode] = useState<"disclosed" | "unknown">("disclosed");
+  const [shiftedVacancies, setShiftedVacancies] = useState(false);
+  const [code, setCode] = useState("");
+  const [verificationBundle, setVerificationBundle] = useState("");
   const [modal, setModal] = useState<Modal>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
@@ -100,11 +115,24 @@ export function SharecheckApp() {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
 
+  const cohort = demoCohort(statement, joined);
+  const observations: Observation[] = cohort.map((s) => ({
+    id: s.householdId,
+    unit: s.factors,
+    utilityCharge: s.utilityCents / 100,
+  }));
+  const detective = detectFormula(observations);
+  const inferred = detective.status === "found"
+    ? ratesToWeights(detective.best.rates, rule.totals)
+    : null;
+  const effectiveRule: Rule = formulaMode === "unknown" && inferred
+    ? { ...rule, weights: { sqft: 0, occupants: 0, bedrooms: 0, units: 0, ...inferred.weights } }
+    : rule;
   const result = buildingCheck({
     buildingId: BUILDING.id,
     period: BUILDING.period,
-    rule,
-    statements: demoCohort(statement, joined),
+    rule: effectiveRule,
+    statements: cohort,
     masterBillCents: master ? 240000 : undefined,
   });
   const conclusive = result.status !== "insufficient";
@@ -112,6 +140,61 @@ export function SharecheckApp() {
     ? result.residents.find((r) => r.householdId === "r4")!
     : null;
   const complete = checked && conclusive;
+  const vacancy = complete && conclusive && own
+    ? vacancyCheck({
+        consensusPool: shiftedVacancies ? 2304 : result.consensusCents / 100,
+        masterBill: 2400,
+        commonAreaDeductionPct: effectiveRule.commonAreaFraction,
+        rule: {
+          components: FACTORS.filter((f) => effectiveRule.weights[f] > 0).map((basis) => ({ basis, weight: effectiveRule.weights[basis] })),
+          buildingTotals: effectiveRule.totals,
+        },
+        vacantUnits: Array.from({ length: 3 }, () => ({ sqft: 900, occupants: 0, bedrooms: 2, units: 1 })),
+        yourShare: own.share,
+      })
+    : null;
+  const currentShare = own?.share ?? 1 / 24;
+  const currentPool = conclusive ? result.consensusCents / 100 : 2160;
+  const currentCharge = statement.utilityCents / 100;
+  const currentFee = statement.feeCents / 100;
+  const change = explainChange(
+    { period: "October 2026", share: currentShare, pool: currentPool, charged: currentCharge, fee: currentFee },
+    { period: "November 2026", share: currentShare, pool: currentPool + 240, charged: currentCharge + currentShare * 240 + 12.5, fee: currentFee + 1 },
+  );
+  const codeSource = JSON.stringify({ statement, rule: effectiveRule, cohort, result: conclusive ? { consensusCents: result.consensusCents, own } : null, formulaMode, shiftedVacancies });
+
+  useEffect(() => {
+    if (!complete || !conclusive || !own) {
+      setCode("");
+      setVerificationBundle("");
+      return;
+    }
+    let current = true;
+    const inputs = {
+      version: 1,
+      building: BUILDING.name,
+      period: BUILDING.period,
+      viewer: statement,
+      rule: effectiveRule,
+      consensusCents: result.consensusCents,
+      own: { expectedCents: own.expectedCents, differenceCents: own.differenceCents, deviation: own.deviation },
+      households: cohort.length,
+      formulaMode,
+      vacancyScenario: shiftedVacancies ? "shifted simulation" : "observed sample",
+    };
+    void (async () => {
+      const cohortFingerprint = await reportCode(cohort);
+      const snapshot = { ...inputs, cohortFingerprint };
+      const nextCode = await reportCode(snapshot);
+      if (current) {
+        setCode(nextCode);
+        setVerificationBundle(JSON.stringify({ code: nextCode, inputs: snapshot }, null, 2));
+      }
+    })();
+    return () => { current = false; };
+  // codeSource captures each input change while avoiding a fresh object dependency on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complete, codeSource]);
 
   useEffect(() => {
     if (firstRender.current) {
@@ -243,7 +326,7 @@ export function SharecheckApp() {
   }
   function continueFormula(event: React.FormEvent) {
     event.preventDefault();
-    const issues = validateRule(rule);
+    const issues = formulaMode === "disclosed" ? validateRule(rule) : [];
     if (!confirmed) issues.push("Confirm your statement before continuing.");
     if (issues.length) {
       setErrors(issues);
@@ -259,6 +342,12 @@ export function SharecheckApp() {
       );
       return;
     }
+    if (formulaMode === "unknown" && detective.status !== "found") {
+      setErrors([detective.status === "insufficient_data"
+        ? "Formula Detective needs at least 4 participating households."
+        : "No single formula can be inferred from this sample. Review the inputs or add a different mix of households."]);
+      return;
+    }
     setChecked(true);
     setErrors([]);
   }
@@ -272,6 +361,8 @@ export function SharecheckApp() {
     setChecked(false);
     setUnlocked(false);
     setMaster(false);
+    setFormulaMode("disclosed");
+    setShiftedVacancies(false);
     setSource("sample");
     setErrors([]);
     go("overview");
@@ -308,6 +399,7 @@ export function SharecheckApp() {
       "Your numbers. A clearer picture.",
       "A reproducible calculation and a practical next step.",
     ],
+    verify: ["Verify a report code.", "Compare a shared snapshot with its fingerprint."],
   };
 
   return (
@@ -529,60 +621,10 @@ export function SharecheckApp() {
                   compact
                 />
               </div>
-              <div className="overview-lower">
-                <section className="card how-card">
-                  <div className="section-title">
-                    <h2>A small check. A clearer answer.</h2>
-                    <span className="label">HOW IT WORKS</span>
-                  </div>
-                  <div className="how-steps">
-                    <HowStep
-                      number="01"
-                      icon={FileText}
-                      title="Bring your statement"
-                      text="Confirm your water charge and the factors behind your share."
-                    />
-                    <HowStep
-                      number="02"
-                      icon={Users}
-                      title="Add your neighbours"
-                      text="Compare statements from the same building and month."
-                    />
-                    <HowStep
-                      number="03"
-                      icon={BarChart3}
-                      title="Follow the numbers"
-                      text="See if the implied building totals agree — and what to ask next."
-                    />
-                  </div>
-                  <div className="info-line">
-                    <Info size={15} />
-                    <span>
-                      A consistent split doesn’t prove the building’s total is
-                      correct. That needs the master bill.
-                    </span>
-                  </div>
-                </section>
-                <aside className="evidence-card">
-                  <span className="icon-tile">
-                    <Fingerprint size={23} />
-                  </span>
-                  <h3>
-                    Shared evidence.
-                    <br />
-                    Personal privacy.
-                  </h3>
-                  <p>
-                    Your neighbours see building totals, never your statement,
-                    name, or apartment number.
-                  </p>
-                  <button
-                    className="text-link"
-                    onClick={() => setModal("method")}
-                  >
-                    Our approach to privacy <ArrowRight size={15} />
-                  </button>
-                </aside>
+              <div className="feature-teasers" aria-label="Explore the demo features">
+                <button onClick={() => go("formula")}><Search size={20} /><span><strong>Find the formula</strong><small>Even when it is missing</small></span><ArrowUpRight size={16} /></button>
+                <button onClick={() => go("room")}><Building2 size={20} /><span><strong>Check vacant units</strong><small>See who may bear their share</small></span><ArrowUpRight size={16} /></button>
+                <button onClick={() => go("room")}><History size={20} /><span><strong>Explain a change</strong><small>Follow each dollar</small></span><ArrowUpRight size={16} /></button>
               </div>
               <section className="history-strip">
                 <div>
@@ -610,7 +652,7 @@ export function SharecheckApp() {
                 </div>
                 <div className="month-cell muted">
                   <span>NOV 2026</span>
-                  <strong>Awaiting statement</strong>
+                  <strong>Sample scenario</strong>
                 </div>
                 <button
                   className="icon-button"
@@ -799,7 +841,7 @@ export function SharecheckApp() {
           )}
 
           {page === "formula" && (
-            <div className="two-column no-print">
+            <div className={`two-column no-print ${formulaMode === "unknown" ? "unknown-formula" : ""}`}>
               <form
                 className="card form-card"
                 onSubmit={continueFormula}
@@ -807,11 +849,19 @@ export function SharecheckApp() {
               >
                 <div className="card-heading">
                   <div>
-                    <h2>Your disclosed allocation formula</h2>
-                    <p>Pre-filled from the synthetic Maple Court addendum.</p>
+                    <h2>How is water allocated?</h2>
+                    <p>Use the addendum, or let participating bills reveal a pattern.</p>
                   </div>
                   <Settings2 size={21} />
                 </div>
+                <div className="segmented-control" role="group" aria-label="Formula source">
+                  <button type="button" className={formulaMode === "disclosed" ? "selected" : ""} aria-pressed={formulaMode === "disclosed"} onClick={() => { setFormulaMode("disclosed"); invalidate(); }}>Disclosed formula</button>
+                  <button type="button" className={formulaMode === "unknown" ? "selected" : ""} aria-pressed={formulaMode === "unknown"} onClick={() => { setFormulaMode("unknown"); invalidate(); }}>I don’t have it</button>
+                </div>
+                {formulaMode === "unknown" && (
+                  <FormulaInsight result={detective} compact={false} onAdd={() => go("room")} />
+                )}
+                {formulaMode === "disclosed" && (<>
                 <div className="formula-preview">
                   <span className="eyebrow">
                     YOUR SHARE OF THE BUILDING POOL
@@ -926,6 +976,7 @@ export function SharecheckApp() {
                     }
                   />
                 </div>
+                </>)}
                 <div className="form-actions">
                   <button
                     type="button"
@@ -935,11 +986,11 @@ export function SharecheckApp() {
                     Back to statement
                   </button>
                   <button className="button primary">
-                    Continue to building <ArrowRight size={16} />
+                    {formulaMode === "unknown" ? "Continue to neighbours" : "Continue to building"} <ArrowRight size={16} />
                   </button>
                 </div>
               </form>
-              <aside className="side-notes">
+              {formulaMode === "disclosed" && <aside className="side-notes">
                 <div className="note-block">
                   <span className="icon-tile">
                     <FileCheck2 size={23} />
@@ -982,7 +1033,7 @@ export function SharecheckApp() {
                     </button>
                   </div>
                 )}
-              </aside>
+              </aside>}
             </div>
           )}
 
@@ -1319,6 +1370,19 @@ export function SharecheckApp() {
                   </div>
                 </section>
               )}
+              {joined && (
+                <div className="insight-grid">
+                  <FormulaInsight result={detective} compact onAdd={() => go("formula")} />
+                  {complete && vacancy && own && (
+                    <VacancyInsight
+                      result={vacancy}
+                      shifted={shiftedVacancies}
+                      onToggle={() => setShiftedVacancies((value) => !value)}
+                    />
+                  )}
+                </div>
+              )}
+              {complete && <ChangeInsight result={change} />}
               <section className="card next-month">
                 <History size={21} />
                 <div>
@@ -1330,12 +1394,16 @@ export function SharecheckApp() {
                         ? "review flagged"
                         : "consistent split"
                       : "check pending"}{" "}
-                    <span>·</span> November: awaiting statement
+                    <span>·</span> November: sample scenario available below
                   </p>
                 </div>
-                <span className="pill">DEMO HISTORY</span>
+                <span className="pill">SYNTHETIC HISTORY</span>
               </section>
             </div>
+          )}
+
+          {page === "verify" && (
+            <VerifyPage onCopy={copy} initialBundle={verificationBundle} />
           )}
 
           {page === "report" && !complete && (
@@ -1357,14 +1425,19 @@ export function SharecheckApp() {
           {complete && own && conclusive && (
             <div className={page === "report" ? "" : "print-only"}>
               <AuditReport
-                key={JSON.stringify({ statement, rule, master })}
+                key={JSON.stringify({ statement, rule: effectiveRule, master, formulaMode, shiftedVacancies })}
                 result={result}
                 own={own}
                 statement={statement}
-                rule={rule}
+                rule={effectiveRule}
                 unlocked={unlocked}
                 onUnlock={() => setModal("pricing")}
                 onCopy={copy}
+                formula={detective}
+                vacancy={shiftedVacancies ? null : vacancy}
+                reportCode={code}
+                verificationBundle={verificationBundle}
+                onVerify={() => go("verify")}
               />
             </div>
           )}

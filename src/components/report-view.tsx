@@ -23,6 +23,7 @@ import {
   type Statement,
 } from "@/lib/audit";
 import { managerLetter } from "@/lib/report";
+import { buildingLetter, type DetectiveResult, type VacancyCheckResult } from "@/lib/insights";
 
 type ConclusiveResult = Exclude<AuditResult, { status: "insufficient" }>;
 
@@ -34,6 +35,11 @@ export function AuditReport({
   unlocked,
   onUnlock,
   onCopy,
+  formula,
+  vacancy,
+  reportCode,
+  verificationBundle,
+  onVerify,
 }: {
   result: ConclusiveResult;
   own: ResidentResult;
@@ -42,17 +48,40 @@ export function AuditReport({
   unlocked: boolean;
   onUnlock: () => void;
   onCopy: (text: string) => Promise<void>;
+  formula: DetectiveResult;
+  vacancy: VacancyCheckResult | null;
+  reportCode: string;
+  verificationBundle: string;
+  onVerify: () => void;
 }) {
   const [letter, setLetter] = useState(() =>
     managerLetter(statement, own, rule, result.consensusCents),
   );
+  const [collectiveLetter, setCollectiveLetter] = useState("");
+  const [letterType, setLetterType] = useState<"personal" | "collective">("personal");
+  const activeLetter = letterType === "personal" ? letter : collectiveLetter;
+  function showCollectiveLetter() {
+    if (!collectiveLetter) {
+      setCollectiveLetter(buildingLetter({
+        buildingName: "Maple Court Apartments (DEMO)",
+        period: "October 2026",
+        households: result.residents.length,
+        flaggedCount: result.residents.filter((r) => r.flagged).length,
+        consensusPool: result.consensusCents / 100,
+        formula: formula.status === "found" ? { bases: formula.best.bases, rates: formula.best.rates } : null,
+        vacancy,
+        reportCode,
+      }));
+    }
+    setLetterType("collective");
+  }
   function downloadLetter() {
     const url = URL.createObjectURL(
-      new Blob([letter], { type: "text/plain;charset=utf-8" }),
+      new Blob([activeLetter], { type: "text/plain;charset=utf-8" }),
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "sharecheck-demo-manager-letter.txt";
+    anchor.download = letterType === "personal" ? "sharecheck-personal-letter.txt" : "sharecheck-building-letter.txt";
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -62,7 +91,7 @@ export function AuditReport({
         <div>
           <span className="eyebrow">SHARECHECK / BUILDING REPORT / DEMO</span>
           <h2>Maple Court · October 2026</h2>
-          <p>Water allocation · Synthetic data · SC-DEMO-2026-10</p>
+          <p>Water allocation · Synthetic data · {reportCode || "Calculating report code…"}</p>
         </div>
         {unlocked ? (
           <button
@@ -112,6 +141,10 @@ export function AuditReport({
             </strong>
           </div>
         </div>
+      </section>
+      <section className="report-code-card no-print">
+        <div><span className="eyebrow">REPRODUCIBLE SNAPSHOT</span><strong>{reportCode || "Calculating…"}</strong><small>Changes to included inputs create a different code.</small></div>
+        <div className="button-row"><button className="button secondary small" disabled={!verificationBundle} onClick={() => void onCopy(verificationBundle)}>Copy verification bundle <Copy size={15} /></button><button className="text-link" onClick={onVerify}>Verify code <ArrowRight size={15} /></button></div>
       </section>
       {!unlocked && (
         <section className="card unlock-card no-print">
@@ -290,13 +323,16 @@ export function AuditReport({
             <div className="section-title">
               <div>
                 <span className="eyebrow">A PRACTICAL NEXT STEP</span>
-                <h3>Ask your manager for the missing pieces.</h3>
+                <h3>Request the missing pieces.</h3>
               </div>
               <FileText size={21} />
             </div>
+            <div className="segmented-control no-print" role="group" aria-label="Letter type">
+              <button type="button" className={letterType === "personal" ? "selected" : ""} aria-pressed={letterType === "personal"} onClick={() => setLetterType("personal")}>Personal letter</button>
+              <button type="button" className={letterType === "collective" ? "selected" : ""} aria-pressed={letterType === "collective"} onClick={showCollectiveLetter} disabled={result.residents.length < 3 || !reportCode}>Building letter</button>
+            </div>
             <p className="small-copy no-print">
-              Edit this request before copying or printing it. SHARECHECK does
-              not send messages.
+              {letterType === "collective" ? `${result.residents.length} participating households · no names or apartment numbers` : "Your own statement only"}. Edit before copying or printing. Nothing is sent.
             </p>
             <label className="visually-hidden" htmlFor="manager-letter">
               Editable request to property manager
@@ -304,16 +340,16 @@ export function AuditReport({
             <textarea
               id="manager-letter"
               className="letter-editor no-print"
-              value={letter}
-              onChange={(event) => setLetter(event.target.value)}
+              value={activeLetter}
+              onChange={(event) => letterType === "personal" ? setLetter(event.target.value) : setCollectiveLetter(event.target.value)}
               rows={18}
               spellCheck
             />
-            <div className="printed-letter print-only">{letter}</div>
+            <div className="printed-letter print-only">{activeLetter}</div>
             <div className="letter-actions no-print">
               <button
                 className="button secondary"
-                onClick={() => void onCopy(letter)}
+                onClick={() => void onCopy(activeLetter)}
               >
                 Copy letter <Copy size={15} />
               </button>

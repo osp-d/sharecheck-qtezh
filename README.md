@@ -2,7 +2,7 @@
 
 **Your neighbours’ bills are the evidence.**
 
-A focused hackathon prototype that checks whether one apartment building applied its disclosed water-allocation formula consistently. The final project PDF is the product source of truth; the older pasted draft is background only.
+A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. All resident records shipped with this demo are synthetic.
 
 ## Run
 
@@ -25,14 +25,19 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 
 ## What works
 
-- Guest journey: overview → statement → formula → room → result → report.
+- Guest journey: overview → statement → formula → room → result → report; separate report verification screen.
 - Editable financial inputs and weighted square-foot, occupant, bedroom, and unit formulas.
 - Browser-local text-PDF extraction, with file-size/page limits and manual fallback. This is deterministic extraction, not AI or OCR. Review is mandatory.
 - Building median check, >2% outlier threshold, three-household minimum, and optional master-bill cross-check.
+- Formula Detective: infers a likely charge rule from 4+ participating bills, including ambiguity and insufficient-data states.
+- Vacancy Shift Check: compares the eligible master-bill pool with observed charges; includes a clearly marked shifted-vacancy simulation.
+- Bill-change explanation: a modeled November statement decomposed into building pool, share, fee, and off-formula change. Displayed cents reconcile.
+- Anonymous building letter, in addition to the editable personal manager letter.
+- Deterministic report code and a paste-and-verify JSON bundle. The bundle contains the viewer's row and a fingerprint of the synthetic cohort, not neighbour rows.
 - Synthetic neighbours added only after explicit demo participation consent.
 - Own statement and aggregate results only; other residents’ rows are never rendered.
 - Evidence provenance, mock paywall, editable manager letter, text download, and print-to-PDF report.
-- October history derived from the result, with November clearly awaiting data.
+- October history derived from the result, with November labeled as a sample scenario.
 - Session reset and withdrawal of demo participation.
 
 Default example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool.
@@ -43,7 +48,7 @@ This is a **single-browser, in-memory demo**, not a live resident service. Refre
 
 Use synthetic information. Files are parsed in the browser and are not uploaded. The complete seed dataset exists in the client bundle: this is appropriate only for synthetic fixtures, never real submissions. Hiding rows in the UI is not a production access-control mechanism.
 
-The PDF mentions an existing `src/audit.ts` and ten passing tests, but those files were not attached. This repository contains a newly implemented engine with its own tests. It does not claim to reuse or verify the missing implementation.
+Report codes detect changes to the included snapshot. They do not authenticate bills, prove that a building formula is lawful, or let a third party reproduce private neighbour entries. Formula and vacancy findings are patterns to investigate, not legal conclusions.
 
 ## Deploy
 
@@ -51,16 +56,18 @@ The app uses a Next.js static export so the demo can be hosted without a backend
 
 For Vercel: import this directory as the repository root, use Next.js, run `npm run build`, and set the output directory to `out`. Alternatively, upload the contents of `out/` to a static host. All links and assets assume hosting at the domain root. `npm run start` is not used for a static export.
 
-No public repository or live deployment is created by the source code itself. Before sharing with judges, follow [the release checklist](docs/IMPLEMENTATION_PLAN.md#release-checklist).
+The source repository is [public on GitHub](https://github.com/osp-d/sharecheck-qtezh). Hosting the static `out/` directory requires no backend or API keys. See [the release checklist](docs/IMPLEMENTATION_PLAN.md#release-checklist) before sharing with judges.
 
 ## Project map
 
 ```text
 src/lib/audit.ts                 Pure calculation engine and validation
+src/lib/insights.ts              Formula, vacancy, change, letter, and code functions
 src/lib/demo.ts                  Clearly synthetic fixtures
 src/lib/statement-parser.ts      Conservative PDF field extraction
 src/lib/report.ts                Manager-request generation
 src/components/sharecheck-app.tsx Journey state and screens
+src/components/insights-panels.tsx Insight and verification screens
 src/components/report-view.tsx   Calculation, letter, and printable report
 src/app/globals.css              Responsive interface and print styles
 public/samples/                  Synthetic statement, addendum, master bill

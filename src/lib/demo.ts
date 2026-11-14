@@ -9,7 +9,7 @@ export const BUILDING = {
 };
 export const DEMO_RULE: Rule = {
   weights: { sqft: 0.5, occupants: 0.5, bedrooms: 0, units: 0 },
-  totals: { sqft: 21600, occupants: 48, bedrooms: 48, units: 24 },
+  totals: { sqft: 21600, occupants: 48, bedrooms: 36, units: 24 },
   commonAreaFraction: 0.1,
   billingFeeCents: 395,
 };
@@ -31,11 +31,11 @@ const resident = (
 });
 /** Synthetic fixtures from the final brief, never real residents' information. */
 export const DEMO_STATEMENTS: Statement[] = [
-  resident("r1", 650, 1, 5500),
+  { ...resident("r1", 650, 1, 5500), factors: { sqft: 650, occupants: 1, bedrooms: 1, units: 1 } },
   resident("r2", 900, 2, 9000),
   resident("r3", 1100, 3, 12250),
   resident("r4", 900, 2, 11250),
-  resident("r5", 650, 2, 7750),
+  { ...resident("r5", 650, 2, 7750), factors: { sqft: 650, occupants: 2, bedrooms: 1, units: 1 } },
   resident("r6", 1100, 2, 10000, "self-reported"),
 ];
 export const YOUR_STATEMENT = DEMO_STATEMENTS[3];

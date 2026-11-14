@@ -11,8 +11,12 @@ flowchart LR
   Rules[Disclosed rule] --> Engine[Pure calculation engine]
   State --> Engine
   Seed[Synthetic neighbour fixtures] --> Engine
+  Seed --> Insights[Pure insight functions]
+  State --> Insights
   Engine --> View[Own result and aggregate evidence]
+  Insights --> View
   View --> Report[Calculation trail and editable letter]
+  Report --> Verify[Report snapshot and code verification]
   Report --> Print[Browser print to PDF]
 ```
 
@@ -42,9 +46,19 @@ The optional master cross-check uses `masterBill × (1 − commonAreaFraction)` 
 
 Validation rejects incomplete active totals, invalid weights, missing factors, duplicate household IDs, incompatible cohorts, invalid amounts, and zero consensus. Three households is a minimum sample rule; it does not establish authenticity, representativeness, or adequate production privacy. Half or more unreliable entries can defeat the median. Even universal agreement cannot validate an inflated actual building cost.
 
+## Insight contract
+
+Formula Detective fits one- and two-factor nonnegative rates to contributed charges. It requires four households, excludes points more than 2% off a candidate, and returns ambiguity when equally simple formulas fit equally well. It needs no building totals to infer rates. Building totals are needed to convert those rates into allocation weights for the building check.
+
+Vacancy Shift Check compares the observed consensus with the master bill after the common-area deduction. Three vacant 900 sq ft units represent 6.25% of the sample rule. The default $2,160 pool matches the eligible bill. A separate what-if toggle evaluates a $2,304 pool. In that scenario $135 is the vacant share of the eligible pool; the gap between eligible and simulated charged pools is $144, giving a $6 modeled impact for a 1/24-share household. The toggle does not alter the observed statement or the manager letter.
+
+The November bill-change view is a modeled month derived from the viewer's confirmed October figures. Its four displayed components are rounded to cents, with any rounding remainder assigned to the off-formula residual, so they sum exactly to the displayed total change.
+
+The building letter uses aggregate counts and findings, never neighbour names or rows. It is unavailable below three households. The report code is a truncated SHA-256 hash of a JSON snapshot plus a fingerprint of the synthetic cohort. The verification view recomputes the code from a pasted bundle. This checks bundle consistency; it does not authenticate underlying documents or expose private cohort inputs.
+
 ## Interface state
 
-Five pages form one client-side journey. Submitted statement data is separate from draft field strings. Every input change invalidates the previous check and report unlock. A result is always derived from the current confirmed statement, rule, participation state, and optional master bill. No stale saved result is reused.
+Six views form one client-side journey, including report verification. Submitted statement data is separate from draft field strings. Every input change invalidates the previous check and report unlock. A result is always derived from the current confirmed statement, rule, participation state, and optional master bill. No stale saved result is reused.
 
 The report’s letter is editable session state. Changing audited inputs remounts the report with a newly generated letter. Refresh resets the complete demonstration. Room links do not serialize financial data.
 
@@ -74,4 +88,4 @@ Real payments, legal judgments, authenticated residence verification, production
 
 `next build` emits the complete app into `out/`. Static export needs no Node server or environment variables. The PDF worker must ship with the same `pdfjs-dist` version used by the browser bundle. A build script copies it before each build.
 
-Automated checks cover arithmetic and text parsing, and strict TypeScript checks the interface. They do not prove browser interaction, mobile rendering, screen-reader behavior, or print layout. Those require the release checklist and actual browser QA. The current task environment lacks the Sites browser-control tool and the installed Sites source/publish helpers, so a deployed URL and browser QA are not claimed.
+Automated checks cover arithmetic, insights, and text parsing, and strict TypeScript checks the interface. They do not prove browser interaction, mobile rendering, screen-reader behavior, or print layout. Those require the release checklist and actual browser QA.
