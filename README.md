@@ -52,6 +52,8 @@ Report codes detect changes to the included snapshot. They do not authenticate b
 
 ## Deploy
 
+Public demo: [SHARECHECK](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site). No sign-up is required.
+
 The app uses a Next.js static export so the demo can be hosted without a backend.
 
 For Vercel: import this directory as the repository root, use Next.js, run `npm run build`, and set the output directory to `out`. Alternatively, upload the contents of `out/` to a static host. All links and assets assume hosting at the domain root. `npm run start` is not used for a static export.

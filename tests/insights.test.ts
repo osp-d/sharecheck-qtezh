@@ -125,7 +125,7 @@ test("F4 letter is collective, anonymous and refuses under 3 households", () => 
     reportCode: "SC-0000-0000-0000",
   });
   assert.match(text, /6 households/);
-  assert.match(text, /\$0\.05 per sq ft plus \$22\.5 per occupant/);
+  assert.match(text, /\$0\.05 per sq ft plus \$22\.50 per occupant/);
   assert.doesNotMatch(text, /r4|unit \d/i);
   assert.throws(() => buildingLetter({ buildingName: "X", period: "Oct", households: 2, flaggedCount: 0, consensusPool: 1 }));
 });

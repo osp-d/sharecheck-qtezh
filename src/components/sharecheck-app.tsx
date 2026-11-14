@@ -56,13 +56,13 @@ import { FormulaInsight, VacancyInsight, ChangeInsight, VerifyPage } from "./ins
 
 type Page = "overview" | "statement" | "formula" | "room" | "report" | "verify";
 type Modal = "method" | "invite" | "pricing" | null;
-const NAV: { id: Page; name: string; icon: LucideIcon }[] = [
-  { id: "overview", name: "Overview", icon: Home },
-  { id: "statement", name: "Your statement", icon: FileText },
-  { id: "formula", name: "Building formula", icon: Settings2 },
-  { id: "room", name: "Building room", icon: Users },
-  { id: "report", name: "Your report", icon: ClipboardCheck },
-  { id: "verify", name: "Verify report", icon: Fingerprint },
+const NAV: { id: Page; name: string; short: string; icon: LucideIcon }[] = [
+  { id: "overview", name: "Overview", short: "Home", icon: Home },
+  { id: "statement", name: "Your statement", short: "Bill", icon: FileText },
+  { id: "formula", name: "Building formula", short: "Formula", icon: Settings2 },
+  { id: "room", name: "Building room", short: "Room", icon: Users },
+  { id: "report", name: "Your report", short: "Report", icon: ClipboardCheck },
+  { id: "verify", name: "Verify report", short: "Verify", icon: Fingerprint },
 ];
 
 type FieldValues = {
@@ -420,15 +420,16 @@ export function SharecheckApp() {
         </button>
         <div className="workspace-label">YOUR WORKSPACE</div>
         <nav aria-label="Main navigation">
-          {NAV.map(({ id, name, icon: Icon }) => (
+          {NAV.map(({ id, name, short, icon: Icon }) => (
             <button
               key={id}
               className={`nav-item ${page === id ? "active" : ""}`}
               onClick={() => go(id)}
+              aria-label={name}
               aria-current={page === id ? "page" : undefined}
             >
               <Icon size={18} strokeWidth={1.7} />
-              <span>{name}</span>
+              <span className="nav-full">{name}</span><span className="nav-short" aria-hidden="true">{short}</span>
               {id === "room" && (
                 <span className="nav-count">{joined ? 6 : 1}</span>
               )}

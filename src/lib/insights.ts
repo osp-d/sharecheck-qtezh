@@ -244,14 +244,14 @@ export function buildingLetter(f: {
     `Together, our statements imply a building water pool of $${f.consensusPool.toFixed(2)}.`,
   );
   if (f.flaggedCount > 0)
-    lines.push(`${f.flaggedCount} household(s) were billed differently from the formula applied to everyone else.`);
+    lines.push(`${f.flaggedCount} ${f.flaggedCount === 1 ? "household was" : "households were"} billed differently from the formula applied to the others.`);
   if (f.formula) {
-    const r = Object.entries(f.formula.rates).map(([b, v]) => `$${v} per ${b === "sqft" ? "sq ft" : b.replace(/s$/, "")}`);
+    const r = Object.entries(f.formula.rates).map(([b, v]) => `$${v.toFixed(2)} per ${b === "sqft" ? "sq ft" : b.replace(/s$/, "")}`);
     lines.push(`Our bills are consistent with a charge of ${r.join(" plus ")}.`);
   }
   if (f.vacancy?.finding === "vacancies_billed_to_residents")
     lines.push(
-      `Our bills are consistent with vacant apartments' share (about $${f.vacancy.extraBilledToResidentsPerMonth.toFixed(2)} this month) being divided among occupied apartments.`,
+      `Our bills are consistent with a vacancy shift. Vacant apartments represent about $${f.vacancy.extraBilledToResidentsPerMonth.toFixed(2)} of the eligible pool, while the observed pool is higher.`,
     );
   lines.push("", "We ask you to provide, in writing:");
   lines.push("1. The allocation formula and the building totals it uses.");
@@ -259,7 +259,7 @@ export function buildingLetter(f: {
   lines.push("3. How common areas and vacant apartments are treated in the allocation.");
   if (f.flaggedCount > 0) lines.push("4. A review of the household charges that do not match the formula.");
   lines.push("", "Sincerely,", `${f.households} participating households`);
-  if (f.reportCode) lines.push("", `Anyone can re-run these calculations with report code ${f.reportCode}.`);
+  if (f.reportCode) lines.push("", `Report snapshot code: ${f.reportCode}.`);
   lines.push("", "This letter reports calculations, not legal conclusions.");
   return lines.join("\n");
 }

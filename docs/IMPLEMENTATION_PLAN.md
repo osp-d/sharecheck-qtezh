@@ -1,5 +1,7 @@
 # Lean implementation plan
 
+Current release: Formula Detective, Vacancy Shift Check, modeled bill-change explanation, anonymous building letter, and report-code verification are implemented and tested. The public demo is [online](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site). The sections below record the original implementation plan and pilot backlog; their older status labels are historical.
+
 ## Product decision
 
 Prove one thing well: residents’ statements can reveal inconsistent application of a shared utility formula without access to the landlord’s master bill. A report must explain both the arithmetic and its limits.
