@@ -92,18 +92,18 @@ export function AuditReport({
               ? { bases: formula.best.bases, rates: formula.best.rates }
               : null,
           vacancy,
-          reportCode,
+          reportCode: unlocked ? reportCode : undefined,
         }),
       );
     setLetterType("collective");
   }
-  function download() {
+  function download(letter = activeLetter, kind: string = letterType) {
     const url = URL.createObjectURL(
-      new Blob([activeLetter], { type: "text/plain;charset=utf-8" }),
+      new Blob([letter], { type: "text/plain;charset=utf-8" }),
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `sharecheck-${letterType}-letter.txt`;
+    link.download = `sharecheck-${kind}-letter.txt`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -193,6 +193,57 @@ export function AuditReport({
         </div>
       )}
 
+      {!unlocked && result.residents.length >= 3 && (
+        <section className={`${panel} no-print`}>
+          <span className={smallLabel}>Free for the building</span>
+          <h3 className="mt-2 font-display text-lg font-bold">
+            Ask for the missing records together
+          </h3>
+          <p className="mt-1 text-xs text-muted">
+            An anonymous draft for {result.residents.length} sample households.
+            Nothing is sent.
+          </p>
+          {!collectiveLetter ? (
+            <button
+              type="button"
+              onClick={openCollective}
+              className="mt-5 min-h-11 rounded-xl border border-stroke px-4 text-sm font-semibold text-forest hover:border-forest"
+            >
+              Generate free building letter
+            </button>
+          ) : (
+            <>
+              <label htmlFor="free-building-letter" className="sr-only">
+                Editable building letter
+              </label>
+              <textarea
+                id="free-building-letter"
+                rows={11}
+                value={collectiveLetter}
+                onChange={(event) => setCollectiveLetter(event.target.value)}
+                className="mt-5 w-full resize-y rounded-xl border border-stroke bg-canvas p-4 text-sm leading-6 focus:border-forest"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onCopy(collectiveLetter)}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stroke px-4 text-xs font-semibold"
+                >
+                  <Copy size={14} /> Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => download(collectiveLetter, "building")}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stroke px-4 text-xs font-semibold"
+                >
+                  <Download size={14} /> Download
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {!unlocked ? (
         !checkoutOpen ? (
           <section
@@ -203,10 +254,10 @@ export function AuditReport({
                 Full report · {formatMoney(REPORT_PRICE_CENTS)} one time
               </span>
               <h3 className="mt-2 font-display text-lg font-bold">
-                Calculation and editable letters
+                Personal calculation and letter
               </h3>
               <p className="mt-1 text-xs text-muted">
-                See the exact split, evidence, and manager letter.
+                See your calculation, evidence, and personal manager letter.
               </p>
             </div>
             <button
@@ -293,7 +344,10 @@ export function AuditReport({
               <button
                 type="button"
                 disabled={!codeApplied || !order.accepted}
-                onClick={onUnlock}
+                onClick={() => {
+                  setLetterType("personal");
+                  onUnlock();
+                }}
                 className="min-h-11 rounded-xl bg-forest px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Complete demo order
@@ -449,7 +503,7 @@ export function AuditReport({
               </button>
               <button
                 type="button"
-                onClick={download}
+                onClick={() => download()}
                 className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stroke px-4 text-xs font-semibold"
               >
                 <Download size={14} /> Download

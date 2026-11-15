@@ -701,7 +701,7 @@ export function SharecheckApp() {
             <p className="mt-4 max-w-xl text-sm text-muted">
               {entryMode === "moving"
                 ? "Explore three months of fictional building history before signing."
-                : "Choose a fictional building to explore its water bill. Each has six sample statements."}
+                : "Check your own charge using building records, or explore a fictional example."}
             </p>
             <div
               className="mt-6 inline-flex rounded-xl border border-stroke bg-white p-1"
@@ -745,7 +745,33 @@ export function SharecheckApp() {
                 </button>
               </div>
             )}
-            <div className="mt-9 grid gap-3 sm:grid-cols-2">
+            {entryMode === "bill" && (
+              <section className="mt-9 flex flex-wrap items-center justify-between gap-5 rounded-3xl border border-forest/20 bg-mist p-6 sm:p-8">
+                <div className="max-w-xl">
+                  <span className={eyebrow}>Your own documents</span>
+                  <h2 className="mt-2 font-display text-xl font-bold">
+                    Check a real water charge
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Enter your bill and the building records. Missing something?
+                    Get a request for it. No neighbours needed.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => chooseBuilding("other")}
+                  className={primary}
+                >
+                  Use my documents <ArrowRight size={16} />
+                </button>
+              </section>
+            )}
+            <h2 className="mt-10 font-display text-lg font-bold">
+              {entryMode === "moving"
+                ? "Explore sample histories"
+                : "Explore a sample building"}
+            </h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {DEMO_BUILDINGS.map((building) => (
                 <button
                   key={building.id}
@@ -834,19 +860,16 @@ export function SharecheckApp() {
                 </div>
               </section>
             )}
-            <button
-              type="button"
-              onClick={() => chooseBuilding("other")}
-              className="mt-4 flex min-h-14 w-full items-center justify-between rounded-2xl border border-dashed border-stroke px-5 text-left text-sm font-semibold hover:border-forest"
-            >
-              <span>
-                My building is not listed{" "}
-                <span className="ml-2 font-normal text-muted">
-                  Check with my own documents
-                </span>
-              </span>
-              <ArrowRight size={17} />
-            </button>
+            {entryMode === "moving" && (
+              <button
+                type="button"
+                onClick={() => chooseBuilding("other")}
+                className="mt-4 flex min-h-14 w-full items-center justify-between rounded-2xl border border-dashed border-stroke px-5 text-left text-sm font-semibold hover:border-forest"
+              >
+                <span>My building is not listed</span>
+                <ArrowRight size={17} />
+              </button>
+            )}
           </div>
         )}
 

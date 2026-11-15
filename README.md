@@ -8,9 +8,9 @@ SHARECHECK helps a renter check a water charge against the building's disclosed 
 
 ## Try it
 
-1. For an independent check, choose **My building is not listed → Check with my own documents**. Enter your statement, disclosed allocation rule, building totals, and same-month master bill. If something is missing, run the check to see what is needed and draft a records request. Use **Load complete sample** to try this with editable synthetic figures.
+1. For an independent check, choose **Use my documents**. Enter your statement, disclosed allocation rule, building totals, and same-month master bill. If something is missing, run the check to see what is needed and draft a records request. Use **Load complete sample** to try this with editable synthetic figures.
 2. For the neighbour comparison demo, choose **Maple Court Apartments** and confirm the sample statement. To test upload, download the PDF above and select **Choose PDF** on the Statement screen.
-3. Continue through **Formula** and **Building room**. Add synthetic neighbours, run the check, and open the report. The proposed price is **$4.99 once**; enter the visible code `DEMO100` in the demo checkout to bring the total to **$0**. No payment is taken.
+3. Continue through **Formula** and **Building room**. Add synthetic neighbours, run the check, and open the report. The building letter is free. The proposed personal report price is **$9.99 once**; enter the visible code `DEMO100` in the demo checkout to bring the total to **$0**. No payment is taken.
 
 The sample goes through the same calculation path as edited inputs. Change the figures and the result changes with them.
 
@@ -29,10 +29,10 @@ You can also choose **Moving** to inspect three months of calculated sample hist
 - Formula Detective, which infers a likely rule from at least four contributed bills and reports insufficient or ambiguous evidence instead of guessing.
 - Vacancy Shift Check, which compares the observed pool with the eligible master bill and offers a clearly marked what-if scenario.
 - A modeled October-to-November bill-change explanation whose displayed parts add to the cent.
-- A report with the calculation trail, evidence counts, editable personal and anonymous building letters, text download, and print-to-PDF.
+- A free, editable anonymous building letter and a personal report with the calculation trail, evidence counts, editable personal letter, text download, and print-to-PDF.
 - A deterministic report code and paste-and-verify JSON bundle. The bundle includes the viewer's row and a fingerprint of the cohort, not neighbour rows.
 - Synthetic neighbours added after explicit demo participation consent; session reset and withdrawal are available. Other residents' rows are never rendered in the interface.
-- A $4.99 one-time report gate. The visible `DEMO100` code makes the simulated checkout total $0; completing that demo order unlocks the detailed report.
+- A $9.99 one-time personal report gate. The visible `DEMO100` code makes the simulated checkout total $0; completing that demo order unlocks the detailed report. The building letter requires no checkout.
 
 For Maple Court, the **$112.50** utility charge compares with a **$90.00** estimate: a **$22.50**, or **25%**, difference. The **$3.95** fee is separate. A fictional $2,400 master bill, less a 10% common-area deduction, supports the $2,160 building pool.
 

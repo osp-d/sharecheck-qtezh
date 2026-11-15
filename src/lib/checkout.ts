@@ -1,4 +1,4 @@
-export const REPORT_PRICE_CENTS = 499;
+export const REPORT_PRICE_CENTS = 999;
 export const DEMO_ACCESS_CODE = "DEMO100";
 
 export function demoOrder(code: string) {
