@@ -17,6 +17,11 @@ import {
   type VacancyCheckResult,
 } from "@/lib/insights";
 import { managerLetter } from "@/lib/report";
+import {
+  DEMO_ACCESS_CODE,
+  REPORT_PRICE_CENTS,
+  demoOrder,
+} from "@/lib/checkout";
 
 type ConclusiveResult = Exclude<AuditResult, { status: "insufficient" }>;
 const panel = "print-card rounded-3xl border border-stroke bg-white p-6 sm:p-8";
@@ -64,6 +69,11 @@ export function AuditReport({
   const [letterType, setLetterType] = useState<"personal" | "collective">(
     "personal",
   );
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [codeApplied, setCodeApplied] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const order = demoOrder(codeApplied ? accessCode : "");
   const activeLetter =
     letterType === "personal" ? personalLetter : collectiveLetter;
 
@@ -153,57 +163,162 @@ export function AuditReport({
         </div>
       </section>
 
-      <div
-        className={`${panel} no-print flex flex-wrap items-center justify-between gap-3 bg-mist`}
-      >
-        <div>
-          <span className={smallLabel}>Report code</span>
-          <strong className="mt-1 block font-display text-lg">
-            {reportCode || "Calculating…"}
-          </strong>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={!verificationBundle}
-            onClick={() => void onCopy(verificationBundle)}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold disabled:opacity-40"
-          >
-            <Copy size={14} /> Copy bundle
-          </button>
-          <button
-            type="button"
-            onClick={onVerify}
-            className="inline-flex min-h-10 items-center gap-2 px-2 text-xs font-semibold text-forest"
-          >
-            Verify <ArrowRight size={14} />
-          </button>
-        </div>
-      </div>
-
-      {!unlocked ? (
-        <section
-          className={`${panel} no-print flex flex-wrap items-center justify-between gap-5`}
+      {unlocked && (
+        <div
+          className={`${panel} no-print flex flex-wrap items-center justify-between gap-3 bg-mist`}
         >
           <div>
-            <span className={smallLabel}>Full report · $4.99 one time</span>
-            <h3 className="mt-2 font-display text-lg font-bold">
-              Calculation and editable letters
-            </h3>
-            <p className="mt-1 text-xs text-muted">
-              Demo access is free. No payment or account is collected.
-            </p>
+            <span className={smallLabel}>Report code</span>
+            <strong className="mt-1 block font-display text-lg">
+              {reportCode || "Calculating…"}
+            </strong>
           </div>
-          <button
-            type="button"
-            onClick={onUnlock}
-            className="min-h-11 rounded-xl bg-forest px-5 text-sm font-semibold text-white hover:bg-ink"
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!verificationBundle}
+              onClick={() => void onCopy(verificationBundle)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold disabled:opacity-40"
+            >
+              <Copy size={14} /> Copy bundle
+            </button>
+            <button
+              type="button"
+              onClick={onVerify}
+              className="inline-flex min-h-10 items-center gap-2 px-2 text-xs font-semibold text-forest"
+            >
+              Verify <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!unlocked ? (
+        !checkoutOpen ? (
+          <section
+            className={`${panel} no-print flex flex-wrap items-center justify-between gap-5`}
           >
-            Unlock demo report
-          </button>
-        </section>
+            <div>
+              <span className={smallLabel}>
+                Full report · {formatMoney(REPORT_PRICE_CENTS)} one time
+              </span>
+              <h3 className="mt-2 font-display text-lg font-bold">
+                Calculation and editable letters
+              </h3>
+              <p className="mt-1 text-xs text-muted">
+                See the exact split, evidence, and manager letter.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCheckoutOpen(true)}
+              className="min-h-11 rounded-xl bg-forest px-5 text-sm font-semibold text-white hover:bg-ink"
+            >
+              Continue to demo checkout{" "}
+              <ArrowRight size={15} className="ml-1 inline" />
+            </button>
+          </section>
+        ) : (
+          <section
+            className={`${panel} no-print mx-auto max-w-2xl`}
+            aria-label="Demo checkout"
+          >
+            <span className={smallLabel}>
+              Demo checkout · no payment collected
+            </span>
+            <h3 className="mt-2 font-display text-xl font-bold">Your report</h3>
+            <div className="mt-5 space-y-2 border-y border-stroke py-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <span>Full report</span>
+                <strong>{formatMoney(order.subtotalCents)}</strong>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span>Demo discount</span>
+                <strong>−{formatMoney(order.discountCents)}</strong>
+              </div>
+              <div className="flex justify-between gap-4 border-t border-stroke pt-3 font-bold">
+                <span>Total today</span>
+                <span>{formatMoney(order.totalCents)}</span>
+              </div>
+            </div>
+            <form
+              className="mt-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (demoOrder(accessCode).accepted) {
+                  setCodeApplied(true);
+                  setCheckoutError("");
+                } else {
+                  setCodeApplied(false);
+                  setCheckoutError("Enter the demo code shown below.");
+                }
+              }}
+            >
+              <label
+                htmlFor="access-code"
+                className="block text-xs font-semibold"
+              >
+                Access code
+              </label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <input
+                  id="access-code"
+                  value={accessCode}
+                  onChange={(event) => {
+                    setAccessCode(event.target.value);
+                    setCodeApplied(false);
+                    setCheckoutError("");
+                  }}
+                  autoComplete="off"
+                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-stroke px-3 text-sm outline-none focus:border-forest"
+                />
+                <button
+                  type="submit"
+                  className="min-h-11 rounded-xl border border-stroke px-4 text-sm font-semibold hover:border-forest"
+                >
+                  Apply
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                Use <strong className="text-ink">{DEMO_ACCESS_CODE}</strong> to
+                try the complete flow.
+              </p>
+              {checkoutError && (
+                <p className="mt-2 text-xs text-amber-800" role="alert">
+                  {checkoutError}
+                </p>
+              )}
+            </form>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={!codeApplied || !order.accepted}
+                onClick={onUnlock}
+                className="min-h-11 rounded-xl bg-forest px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Complete demo order
+              </button>
+              <button
+                type="button"
+                onClick={() => setCheckoutOpen(false)}
+                className="min-h-11 px-3 text-sm font-semibold text-muted hover:text-ink"
+              >
+                Back
+              </button>
+            </div>
+            <p className="mt-4 text-[11px] text-muted">
+              This is a simulated checkout. No card details, account, or charge.
+            </p>
+          </section>
+        )
       ) : (
         <>
+          <p
+            className="no-print rounded-xl bg-mist px-4 py-3 text-xs font-semibold text-forest"
+            role="status"
+          >
+            Demo order complete · $0 charged · report unlocked
+          </p>
           <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
             <section className={panel}>
               <span className={smallLabel}>Calculation</span>

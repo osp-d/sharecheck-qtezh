@@ -6,6 +6,8 @@
 
 Public web demo · No sign-up · Synthetic data
 
+Sample upload: [download the Maple Court test statement PDF](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site/samples/maple-court-statement.pdf). In the site, choose **Maple Court → Statement → Choose PDF**, then confirm the extracted figures.
+
 A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. Start by choosing one of four fictional buildings. An unlisted building shows an honest no-data state. All resident records shipped with this demo are synthetic.
 
 The interface uses **Tailwind CSS v4** with a small theme and print stylesheet in `src/app/globals.css`.
@@ -45,7 +47,7 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 - Deterministic report code and a paste-and-verify JSON bundle. The bundle contains the viewer's row and a fingerprint of the synthetic cohort, not neighbour rows.
 - Synthetic neighbours added only after explicit demo participation consent.
 - Own statement and aggregate results only; other residents’ rows are never rendered.
-- Evidence provenance, a $4.99 one-time report price with free demo unlock, editable manager letter, text download, and print-to-PDF report. No payment is taken.
+- Evidence provenance, a $4.99 one-time report gate with a simulated checkout. Enter the visible `DEMO100` code for a $0 total, complete the demo order, then open editable letters and print-to-PDF. No payment is taken.
 - Session reset and withdrawal of demo participation.
 
 Maple Court example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool. All amounts are fictional.
@@ -53,6 +55,8 @@ Maple Court example: **$112.50** utility charge, **$90.00** consensus estimate, 
 ## Deliberate boundaries
 
 This is a **single-browser demo**, not a live resident service. Refresh clears bill edits and the current selection. Only a saved building ID persists in this browser's localStorage; it can be removed in the Moving view. No bill or contact details are persisted. Invitation links open independent synthetic sessions. Evidence counts for neighbours are simulated fixture metadata; no documents are authenticated. There is no live database, cross-device history, email, payments, subscriptions, scheduled monitoring, OCR, or LLM integration. The moving history is fictional and stays the same until the demo code changes. The downloadable PDF statement and master bill are Maple Court examples only; other building figures are prefilled synthetic inputs.
+
+The checkout is a local demonstration of the price and access gate. It collects no card number and issues no real payment or purchase. A live paid version would need a payment-provider account, server-side checkout session creation, a verified payment webhook, durable entitlement storage, and refund/support procedures.
 
 The current core is water. Sewer and trash could reuse the shared-cost engine when a building actually allocates them from a common pool, but each needs a separate utility-specific cohort and rule. Individually metered electricity needs a different comparison model and is outside this demo.
 
@@ -80,6 +84,7 @@ src/lib/insights.ts              Formula, vacancy, change, letter, and code func
 src/lib/demo.ts                  Clearly synthetic fixtures
 src/lib/statement-parser.ts      Conservative PDF field extraction
 src/lib/report.ts                Manager-request generation
+src/lib/checkout.ts              Demo price and access-code calculation
 src/components/sharecheck-app.tsx Journey state and screens
 src/components/insights-panels.tsx Insight and verification screens
 src/components/report-view.tsx   Calculation, letter, and printable report

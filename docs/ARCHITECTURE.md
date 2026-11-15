@@ -86,7 +86,7 @@ Original documents, if needed, belong in private object storage with scoped sign
 
 ## Non-goals for the hackathon
 
-Real payments, legal judgments, authenticated residence verification, production anonymization, generalized OCR, live messages, notifications, arbitrary utilities, and live historical monitoring. The UI calls these out rather than simulating a successful real service. The report gate displays a proposed $4.99 one-time price; unlocking in this demo is free and no checkout runs.
+Real payments, legal judgments, authenticated residence verification, production anonymization, generalized OCR, live messages, notifications, arbitrary utilities, and live historical monitoring. The UI calls these out rather than simulating a successful real service. The report gate displays a proposed $4.99 one-time price. Its browser-local demo checkout requires the visible `DEMO100` access code and calculates a $0 total before unlocking; it never collects payment details or grants a durable paid entitlement.
 
 ## Deployment and verification
 

@@ -1026,12 +1026,13 @@ export function SharecheckApp() {
             </form>
             {activeBuilding.id === "maple-court-demo" && (
               <aside className={`${panel} h-fit`}>
-                <span className={eyebrow}>Optional PDF</span>
+                <span className={eyebrow}>Try PDF upload</span>
                 <h3 className="mt-2 font-display text-lg font-bold">
                   Read it locally
                 </h3>
                 <p className="mt-2 text-xs leading-5 text-muted">
-                  Text PDFs only. Your file stays in this browser.
+                  Download the test PDF, then choose it here. Reading stays in
+                  this browser.
                 </p>
                 <input
                   ref={fileInput}
@@ -1066,7 +1067,7 @@ export function SharecheckApp() {
                   download
                   className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-forest hover:underline"
                 >
-                  Download sample <Download size={14} />
+                  Download test PDF <Download size={14} />
                 </a>
               </aside>
             )}
@@ -1502,7 +1503,10 @@ export function SharecheckApp() {
             />
           ))}
         {page === "verify" && (
-          <VerifyPage initialBundle={verificationBundle} onCopy={copy} />
+          <VerifyPage
+            initialBundle={unlocked ? verificationBundle : ""}
+            onCopy={copy}
+          />
         )}
         <footer className="no-print mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-6 text-[11px] text-muted">
           <span>SHARECHECK · Synthetic demo</span>
