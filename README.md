@@ -4,13 +4,13 @@
 
 [Open the live demo](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site) · [Download a test statement PDF](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site/samples/maple-court-statement.pdf)
 
-SHARECHECK helps a renter compare a water charge with other households in the same building. It estimates the expected charge from the building's allocation rule, flags a difference worth asking about, and prepares an editable request to the property manager. The demo works in a browser without an account. **Every building and neighbour statement in it is fictional.**
+SHARECHECK helps a renter check a water charge against the building's disclosed rule, totals, and master bill. If those records are missing, it drafts a request for them. A separate demo compares neighbours in the same building. The site works in a browser without an account. **Every preloaded building and neighbour statement is fictional.**
 
 ## Try it
 
-1. Choose **Maple Court Apartments** and confirm the sample statement. To test upload, download the PDF above and select **Choose PDF** on the Statement screen.
-2. Continue through **Formula** and **Building room**. Add the synthetic neighbours, then run the check.
-3. Open the report. The proposed price is **$4.99 once**; enter the visible code `DEMO100` in the demo checkout to bring the total to **$0** and unlock it. No payment is taken.
+1. For an independent check, choose **My building is not listed → Check with my own documents**. Enter your statement, disclosed allocation rule, building totals, and same-month master bill. If something is missing, run the check to see what is needed and draft a records request. Use **Load complete sample** to try this with editable synthetic figures.
+2. For the neighbour comparison demo, choose **Maple Court Apartments** and confirm the sample statement. To test upload, download the PDF above and select **Choose PDF** on the Statement screen.
+3. Continue through **Formula** and **Building room**. Add synthetic neighbours, run the check, and open the report. The proposed price is **$4.99 once**; enter the visible code `DEMO100` in the demo checkout to bring the total to **$0**. No payment is taken.
 
 The sample goes through the same calculation path as edited inputs. Change the figures and the result changes with them.
 
@@ -19,8 +19,9 @@ You can also choose **Moving** to inspect three months of calculated sample hist
 ## What the prototype includes
 
 - Guest journey: building chooser → statement → formula → building room → result → report, plus a separate verification screen.
+- Independent, neighbour-free calculation from a renter's own statement, disclosed weights and building totals, and master water bill for the same month. Missing or conflicting inputs withhold a result and produce a draft request; a flagged difference produces a clarification draft.
 - Four synthetic buildings with six statements each: Maple Court (area and occupants), Birch Gardens (equal split), Riverstone Lofts (area), and Cedar Point (bedrooms). Three sample viewers have flagged differences; Riverstone's is consistent.
-- An unlisted-building state with no fabricated comparison or notification signup.
+- An unlisted-building state with no fabricated neighbour comparison or notification signup. Its independent check uses only entered values and does not require a building database.
 - A Moving preview with three synthetic months per listed building. Save one building for a later visit in the same browser.
 - Editable charges, fees, apartment details, building totals, and weighted area, occupant, bedroom, and unit formulas.
 - Browser-local text-PDF extraction with file-size and page limits. It is deterministic text extraction, not OCR or AI. The resident must review the fields; manual entry remains available.
@@ -39,7 +40,7 @@ The comparison identifies a **calculation discrepancy**, not proof of unfair or 
 
 ## Demo limits
 
-This is a **single-browser demo**, not a live resident service. Refresh clears bill edits and the current selection. Only a saved fictional building ID persists in localStorage, and it can be removed in the Moving view. No bill or contact details are persisted. Invitation links open independent synthetic sessions. The moving history is fictional and does not update from residents.
+This is a **single-browser demo**, not a live resident service. The independent check accepts actual values but does not authenticate the documents or determine whether a charge is lawful. Refresh clears bill edits and the current selection. Only a saved fictional building ID persists in localStorage, and it can be removed in the Moving view. No bill or contact details are persisted. Invitation links open independent synthetic sessions. The moving history is fictional and does not update from residents.
 
 Uploads are parsed in the browser and are not sent to a backend. The downloadable statement, addendum, and master bill PDFs belong to the Maple Court example; the other buildings have prefilled synthetic figures. Evidence counts are fixture metadata, and documents are not authenticated. The complete seed dataset is in the client bundle, which is suitable for a fictional demo only. Hiding neighbour rows in the interface would not protect real submissions.
 
@@ -86,6 +87,7 @@ The [public Site](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site
 
 ```text
 src/lib/audit.ts                 Allocation engine and validation
+src/lib/independent-check.ts     One-bill calculation and evidence requests
 src/lib/insights.ts              Formula, vacancy, change, letter, and code functions
 src/lib/demo.ts                  Synthetic building fixtures
 src/lib/history.ts               Computed three-month moving history
@@ -93,6 +95,7 @@ src/lib/statement-parser.ts      PDF text extraction
 src/lib/report.ts                Manager-request generation
 src/lib/checkout.ts              Demo price and access-code calculation
 src/components/sharecheck-app.tsx Journey state and screens
+src/components/independent-check.tsx Own-document check and requests
 src/components/insights-panels.tsx Insight and verification screens
 src/components/report-view.tsx   Calculation, letters, checkout, and report
 src/app/globals.css              Tailwind import, theme, fonts, print rules

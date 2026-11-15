@@ -47,6 +47,7 @@ import {
   VerifyPage,
 } from "./insights-panels";
 import { AuditReport } from "./report-view";
+import { IndependentCheck } from "./independent-check";
 
 type Page = "overview" | "statement" | "formula" | "room" | "report" | "verify";
 type FieldValues = {
@@ -838,35 +839,36 @@ export function SharecheckApp() {
               onClick={() => chooseBuilding("other")}
               className="mt-4 flex min-h-14 w-full items-center justify-between rounded-2xl border border-dashed border-stroke px-5 text-left text-sm font-semibold hover:border-forest"
             >
-              My building is not listed <ArrowRight size={17} />
+              <span>
+                My building is not listed{" "}
+                <span className="ml-2 font-normal text-muted">
+                  Check with my own documents
+                </span>
+              </span>
+              <ArrowRight size={17} />
             </button>
           </div>
         )}
 
         {page === "overview" && emptyBuilding && (
-          <section className={`${panel} no-print mx-auto max-w-2xl`}>
-            <span className={eyebrow}>Your building</span>
-            <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">
-              {entryMode === "moving" ? "No history yet" : "No shared data yet"}
-            </h1>
-            <p className="mt-5 text-sm leading-6 text-muted">
-              An unlisted building has no shared statements here. A comparison
-              needs at least three from the same building and month. This demo
-              does not save bill submissions or send alerts.
-            </p>
-            <div className="mt-6 rounded-2xl bg-mist p-4 text-xs leading-5 text-forest">
-              For real alerts, the live service would need a private database,
-              verified building membership, consent, and an email or
-              notification provider.
-            </div>
-            <button
-              type="button"
-              onClick={reset}
-              className={`${secondary} mt-6`}
-            >
+          <div className="space-y-5">
+            <section className={`${panel} no-print`}>
+              <span className={eyebrow}>Your building</span>
+              <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">
+                {entryMode === "moving"
+                  ? "No shared history yet"
+                  : "No shared data yet"}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
+                You can still check your own water charge using the building's
+                documents. No neighbours are needed for that calculation.
+              </p>
+            </section>
+            <IndependentCheck />
+            <button type="button" onClick={reset} className={secondary}>
               Explore sample buildings <ArrowRight size={16} />
             </button>
-          </section>
+          </div>
         )}
 
         {page === "overview" && selectedBuilding && (

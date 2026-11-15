@@ -45,7 +45,7 @@ const row = (
 const mapleId = "maple-court-demo";
 const mapleRule: Rule = {
   weights: { sqft: 0.5, occupants: 0.5, bedrooms: 0, units: 0 },
-  totals: { sqft: 21600, occupants: 48, bedrooms: 36, units: 24 },
+  totals: { sqft: 21600, occupants: 48, bedrooms: 48, units: 24 },
   commonAreaFraction: 0.1,
   billingFeeCents: 395,
 };

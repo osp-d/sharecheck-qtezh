@@ -14,7 +14,9 @@ Use synthetic data and start with **Change building**. This is a navigation scri
 
 Optional after the timed run: show **Why did my bill change?** in the room. November is a modeled example based on the viewer's October inputs; the four parts add to the total to the cent. Change the viewer's October charge by one cent, rerun, and show a different report code.
 
-To show the other state, choose **Change building → My building is not listed**. The screen shows no comparison and no alert signup because no shared data or notification backend exists. Birch and Cedar produce different flagged examples; Riverstone produces a consistent example.
+To show the other state, choose **Change building → My building is not listed**. The screen shows no neighbour comparison or alert signup because no shared data or notification backend exists. It does offer an independent check using the renter's own documents. Birch and Cedar produce different flagged neighbour examples; Riverstone produces a consistent one.
+
+For a real-input path that needs no neighbours, choose **My building is not listed → Check with my own documents**. Click **Check this charge** with missing values to see an evidence checklist and downloadable records request. Then use **Load complete sample → Check this charge** for a live $90.00 expected charge and $22.50 difference, with a separate clarification request. Edit the charge to $90.00 and rerun to see the finding change. The three sample documents are linked beside the load button.
 
 To show the moving use case, choose **Moving → Maple Court Apartments**. Three monthly summaries come from separate synthetic statement cohorts. Save the building, refresh, then use **View history** to demonstrate the browser-local return mechanic. Remove the saved building in that view.
 

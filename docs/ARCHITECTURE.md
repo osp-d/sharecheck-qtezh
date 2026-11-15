@@ -24,9 +24,11 @@ No record is sent to a backend. A saved fictional building ID is the only localS
 
 The interface uses Tailwind CSS utilities in the React components. `globals.css` contains only the Tailwind import, self-hosted fonts, theme tokens, focus styles, and print rules. The six views use a compact header and reveal detailed calculations only in the report.
 
-The client contains four fictional building fixtures with six statements each. The building chooser gates the calculation journey. The Moving view computes August, September, and October summaries through the same allocation engine using separate synthetic monthly statements. An unlisted building enters an empty state and cannot access a fabricated comparison or history. UI privacy in a demo does **not** provide confidentiality for real residents. A production implementation must move the cohort and calculation to an authorized server.
+The client contains four fictional building fixtures with six statements each. The building chooser gates the neighbour-comparison journey. The Moving view computes August, September, and October summaries through the allocation engine using separate synthetic monthly statements. An unlisted building has no neighbour comparison or history; its independent check calculates directly from the renter's entered statement, disclosed rule, building totals, and same-month master bill. If inputs are missing or invalid, it withholds a result and drafts a records request. This is a calculation on self-entered data, not document authentication. UI privacy in a demo does **not** provide confidentiality for real resident cohorts. A production shared room must move the cohort and calculation to an authorized server.
 
 ## Calculation contract
+
+The independent check uses `eligiblePool = masterBill × (1 − commonAreaFraction)` and `expected = roundToCents(share × eligiblePool)`, where share uses the disclosed factor weights and building totals below. It requires a positive water charge, matching statement and master-bill months, weights totaling 100%, valid active factors and totals, and an explicit deduction value (including 0%). A missing document yields an evidence checklist and draft letter. Its 2% flag is a prototype tolerance, not a legal threshold. The separate billing fee does not enter the calculation. Unlike the neighbour median, this path does not need a cohort; its accuracy depends on the entered documents.
 
 For each active factor `f`:
 
