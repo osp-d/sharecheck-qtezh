@@ -6,7 +6,7 @@
 
 Public web demo · No sign-up · Synthetic data
 
-A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. All resident records shipped with this demo are synthetic.
+A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. Start by choosing one of four fictional buildings. An unlisted building shows an honest no-data state. All resident records shipped with this demo are synthetic.
 
 The interface uses **Tailwind CSS v4** with a small theme and print stylesheet in `src/app/globals.css`.
 
@@ -31,7 +31,9 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 
 ## What works
 
-- Guest journey: overview → statement → formula → room → result → report; separate report verification screen.
+- Building chooser → statement → formula → room → result → report; separate report verification screen.
+- Four synthetic buildings with six statements each: Maple Court (area and occupants), Birch Gardens (equal split), Riverstone Lofts (area), and Cedar Point (bedrooms). Three sample viewers have flagged differences; Riverstone's sample viewer is consistent.
+- Unlisted-building state with no invented comparison or notification signup.
 - Editable financial inputs and weighted square-foot, occupant, bedroom, and unit formulas.
 - Browser-local text-PDF extraction, with file-size/page limits and manual fallback. This is deterministic extraction, not AI or OCR. Review is mandatory.
 - Building median check, >2% outlier threshold, three-household minimum, and optional master-bill cross-check.
@@ -43,14 +45,15 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 - Synthetic neighbours added only after explicit demo participation consent.
 - Own statement and aggregate results only; other residents’ rows are never rendered.
 - Evidence provenance, mock paywall, editable manager letter, text download, and print-to-PDF report.
-- A modeled October-to-November explanation appears after the building check.
 - Session reset and withdrawal of demo participation.
 
-Default example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool.
+Maple Court example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool. All amounts are fictional.
 
 ## Deliberate boundaries
 
-This is a **single-browser, in-memory demo**, not a live resident service. Refresh clears edits. Invitation links open independent synthetic sessions. Evidence counts for neighbours are simulated fixture metadata; no documents are authenticated. There is no live database, cross-device history, email, payments, subscriptions, scheduled monitoring, OCR, or LLM integration.
+This is a **single-browser, in-memory demo**, not a live resident service. Refresh clears edits and building selection. Invitation links open independent synthetic sessions. Evidence counts for neighbours are simulated fixture metadata; no documents are authenticated. There is no live database, cross-device history, email, payments, subscriptions, scheduled monitoring, OCR, or LLM integration. The downloadable PDF statement and master bill are Maple Court examples only; other building figures are prefilled synthetic inputs.
+
+For a real "notify me when my building has enough data" flow, collect an email address only after explicit opt-in and a privacy notice. A backend must store a verified building ID, consent, and the contact address separately from submissions, count eligible distinct households by building and month, and send a single threshold alert through an email provider. Residents need a way to unsubscribe and delete their contact data. Publish comparisons only after a privacy threshold chosen for a real pilot; the demo's three-household calculation minimum is not a safe release threshold.
 
 Use synthetic information. Files are parsed in the browser and are not uploaded. The complete seed dataset exists in the client bundle: this is appropriate only for synthetic fixtures, never real submissions. Hiding rows in the UI is not a production access-control mechanism.
 

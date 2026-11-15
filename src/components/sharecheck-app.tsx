@@ -23,7 +23,12 @@ import {
   type Rule,
   type Statement,
 } from "@/lib/audit";
-import { BUILDING, DEMO_RULE, YOUR_STATEMENT, demoCohort } from "@/lib/demo";
+import {
+  DEMO_BUILDINGS,
+  DEMO_RULE,
+  YOUR_STATEMENT,
+  demoCohort,
+} from "@/lib/demo";
 import {
   detectFormula,
   explainChange,
@@ -59,6 +64,14 @@ const INITIAL: FieldValues = {
   bedrooms: "2",
   period: "2026-10",
 };
+const fieldsFrom = (item: Statement): FieldValues => ({
+  charge: (item.utilityCents / 100).toFixed(2),
+  fee: (item.feeCents / 100).toFixed(2),
+  sqft: String(item.factors.sqft),
+  occupants: String(item.factors.occupants),
+  bedrooms: String(item.factors.bedrooms),
+  period: item.period,
+});
 const factorNames = {
   sqft: "Area",
   occupants: "Occupants",
@@ -115,6 +128,9 @@ function Field({
 
 export function SharecheckApp() {
   const [page, setPage] = useState<Page>("overview");
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
+    null,
+  );
   const [fields, setFields] = useState<FieldValues>(INITIAL);
   const [statement, setStatement] = useState<Statement>(YOUR_STATEMENT);
   const [rule, setRule] = useState<Rule>(DEMO_RULE);
@@ -140,8 +156,13 @@ export function SharecheckApp() {
   const fileInput = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
+  const selectedBuilding = DEMO_BUILDINGS.find(
+    (building) => building.id === selectedBuildingId,
+  );
+  const activeBuilding = selectedBuilding ?? DEMO_BUILDINGS[0];
+  const emptyBuilding = selectedBuildingId === "other";
 
-  const cohort = demoCohort(statement, joined);
+  const cohort = demoCohort(statement, joined, activeBuilding);
   const observations: Observation[] = cohort.map((item) => ({
     id: item.householdId,
     unit: item.factors,
@@ -166,15 +187,17 @@ export function SharecheckApp() {
         }
       : rule;
   const result = buildingCheck({
-    buildingId: BUILDING.id,
-    period: BUILDING.period,
+    buildingId: activeBuilding.id,
+    period: activeBuilding.period,
     rule: effectiveRule,
     statements: cohort,
-    masterBillCents: master ? 240000 : undefined,
+    masterBillCents: master ? activeBuilding.masterBillCents : undefined,
   });
   const conclusive = result.status !== "insufficient";
   const own = conclusive
-    ? result.residents.find((resident) => resident.householdId === "r4")!
+    ? result.residents.find(
+        (resident) => resident.householdId === activeBuilding.viewerId,
+      )!
     : null;
   const complete = checked && conclusive;
   const vacancyRule = {
@@ -183,14 +206,10 @@ export function SharecheckApp() {
     ).map((basis) => ({ basis, weight: effectiveRule.weights[basis] })),
     buildingTotals: effectiveRule.totals,
   };
-  const vacantUnits = Array.from({ length: 3 }, () => ({
-    sqft: 900,
-    occupants: 0,
-    bedrooms: 2,
-    units: 1,
-  }));
+  const vacantUnits = activeBuilding.vacantUnits;
   const simulatedVacancyPool =
-    (2400 * (1 - effectiveRule.commonAreaFraction)) /
+    ((activeBuilding.masterBillCents / 100) *
+      (1 - effectiveRule.commonAreaFraction)) /
     (1 - vacantShare(vacancyRule, vacantUnits));
   const vacancy =
     complete && conclusive && own
@@ -198,15 +217,17 @@ export function SharecheckApp() {
           consensusPool: shiftedVacancies
             ? simulatedVacancyPool
             : result.consensusCents / 100,
-          masterBill: 2400,
+          masterBill: activeBuilding.masterBillCents / 100,
           commonAreaDeductionPct: effectiveRule.commonAreaFraction,
           rule: vacancyRule,
           vacantUnits,
           yourShare: own.share,
         })
       : null;
-  const currentShare = own?.share ?? 1 / 24;
-  const currentPool = conclusive ? result.consensusCents / 100 : 2160;
+  const currentShare = own?.share ?? 1 / activeBuilding.units;
+  const currentPool = conclusive
+    ? result.consensusCents / 100
+    : (activeBuilding.masterBillCents / 100) * (1 - rule.commonAreaFraction);
   const currentCharge = statement.utilityCents / 100;
   const currentFee = statement.feeCents / 100;
   const change = explainChange(
@@ -243,8 +264,8 @@ export function SharecheckApp() {
     let current = true;
     const inputs = {
       version: 1,
-      building: BUILDING.name,
-      period: BUILDING.period,
+      building: activeBuilding.name,
+      period: activeBuilding.period,
       viewer: statement,
       rule: effectiveRule,
       consensusCents: result.consensusCents,
@@ -290,6 +311,10 @@ export function SharecheckApp() {
   }, [notice]);
 
   function go(next: Page) {
+    if (!selectedBuilding && next !== "overview" && next !== "verify") {
+      setPage("overview");
+      return;
+    }
     setErrors([]);
     setPage(next);
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -329,14 +354,18 @@ export function SharecheckApp() {
       issues.push("Enter 1 to 100 occupants.");
     if (!/^\d+$/.test(fields.bedrooms) || Number(fields.bedrooms) > 100)
       issues.push("Enter 0 to 100 bedrooms.");
-    if (fields.period !== BUILDING.period)
-      issues.push("This demo accepts October 2026 statements only.");
+    if (fields.period !== activeBuilding.period)
+      issues.push(
+        `This demo accepts ${activeBuilding.periodLabel} statements only.`,
+      );
     if (issues.length) {
       setErrors(issues);
       return;
     }
     setStatement({
-      ...YOUR_STATEMENT,
+      ...activeBuilding.statements.find(
+        (item) => item.householdId === activeBuilding.viewerId,
+      )!,
       factors: {
         sqft: Number(fields.sqft),
         occupants: Number(fields.occupants),
@@ -346,7 +375,14 @@ export function SharecheckApp() {
       utilityCents: Math.round(Number(fields.charge) * 100),
       feeCents: Math.round(Number(fields.fee) * 100),
       period: fields.period,
-      evidence: source === "manual" ? "self-reported" : "document-attached",
+      evidence:
+        source === "pdf"
+          ? "document-attached"
+          : source === "sample"
+            ? activeBuilding.statements.find(
+                (item) => item.householdId === activeBuilding.viewerId,
+              )!.evidence
+            : "self-reported",
     });
     setConfirmed(true);
     invalidate();
@@ -383,9 +419,15 @@ export function SharecheckApp() {
     }
   }
   function loadSample() {
-    setFields(INITIAL);
+    setFields(
+      fieldsFrom(
+        activeBuilding.statements.find(
+          (item) => item.householdId === activeBuilding.viewerId,
+        )!,
+      ),
+    );
     setSource("sample");
-    setDocumentName("Maple Court · October statement.pdf");
+    setDocumentName(`${activeBuilding.name} · October statement.pdf`);
     setConfirmed(false);
     setErrors([]);
     invalidate();
@@ -423,6 +465,7 @@ export function SharecheckApp() {
     setErrors([]);
   }
   function reset() {
+    setSelectedBuildingId(null);
     setFields(INITIAL);
     setStatement(YOUR_STATEMENT);
     setRule(DEMO_RULE);
@@ -438,6 +481,46 @@ export function SharecheckApp() {
     setErrors([]);
     go("overview");
     setNotice("Demo reset.");
+  }
+  function chooseBuilding(id: string) {
+    if (id === "other") {
+      setSelectedBuildingId(id);
+      setConfirmed(false);
+      setJoined(false);
+      setChecked(false);
+      setUnlocked(false);
+      setCode("");
+      setVerificationBundle("");
+      setErrors([]);
+      setNotice("");
+      setPage("overview");
+      return;
+    }
+    const next = DEMO_BUILDINGS.find((building) => building.id === id);
+    if (!next) return;
+    const viewer = next.statements.find(
+      (item) => item.householdId === next.viewerId,
+    )!;
+    setSelectedBuildingId(id);
+    setFields(fieldsFrom(viewer));
+    setStatement(viewer);
+    setRule(structuredClone(next.rule));
+    setConfirmed(false);
+    setJoined(false);
+    setConsent(false);
+    setChecked(false);
+    setUnlocked(false);
+    setMaster(false);
+    setShiftedVacancies(false);
+    setFormulaMode("disclosed");
+    setSource("sample");
+    setDocumentName(`${next.name} · October statement.pdf`);
+    setCode("");
+    setVerificationBundle("");
+    setErrors([]);
+    setNotice("");
+    setPage("statement");
+    window.scrollTo({ top: 0, behavior: "instant" });
   }
   async function copy(text: string) {
     try {
@@ -499,7 +582,8 @@ export function SharecheckApp() {
               onClick={reset}
               className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink"
             >
-              <RotateCcw size={14} /> Reset
+              <RotateCcw size={14} />{" "}
+              {selectedBuildingId ? "Change building" : "Reset"}
             </button>
           </div>
         </div>
@@ -512,8 +596,13 @@ export function SharecheckApp() {
               key={tab.id}
               type="button"
               onClick={() => go(tab.id)}
+              disabled={
+                !selectedBuilding &&
+                tab.id !== "overview" &&
+                tab.id !== "verify"
+              }
               aria-current={page === tab.id ? "page" : undefined}
-              className={`min-h-11 shrink-0 border-b-2 px-2 text-xs font-semibold sm:px-4 ${page === tab.id ? "border-forest text-forest" : "border-transparent text-muted hover:text-ink"}`}
+              className={`min-h-11 shrink-0 border-b-2 px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-35 sm:px-4 ${page === tab.id ? "border-forest text-forest" : "border-transparent text-muted hover:text-ink"}`}
             >
               <span className="sm:hidden">{tab.short}</span>
               <span className="hidden sm:inline">{tab.label}</span>
@@ -529,7 +618,11 @@ export function SharecheckApp() {
         {page !== "overview" && (
           <div className="no-print mb-8 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <span className={eyebrow}>Maple Court / October 2026</span>
+              <span className={eyebrow}>
+                {selectedBuilding
+                  ? `${activeBuilding.name} / ${activeBuilding.periodLabel}`
+                  : "Synthetic demo"}
+              </span>
               <h1
                 ref={titleRef}
                 tabIndex={-1}
@@ -539,9 +632,12 @@ export function SharecheckApp() {
               </h1>
               <p className="mt-3 text-sm text-muted">{pageTitles[page][1]}</p>
             </div>
-            <span className="rounded-full border border-stroke bg-white px-3 py-1 text-xs text-muted">
-              {joined ? 6 : 1} of 24 households
-            </span>
+            {selectedBuilding && (
+              <span className="rounded-full border border-stroke bg-white px-3 py-1 text-xs text-muted">
+                {joined ? activeBuilding.statements.length : 1} of{" "}
+                {activeBuilding.units} households
+              </span>
+            )}
           </div>
         )}
         {errors.length > 0 && (
@@ -558,12 +654,82 @@ export function SharecheckApp() {
           </div>
         )}
 
-        {page === "overview" && (
+        {page === "overview" && !selectedBuildingId && (
+          <div className="no-print mx-auto max-w-5xl">
+            <span className={eyebrow}>SHARECHECK · synthetic demo</span>
+            <h1 className="mt-3 font-display text-4xl font-extrabold tracking-[-0.06em] sm:text-6xl">
+              Which building is yours?
+            </h1>
+            <p className="mt-4 max-w-xl text-sm text-muted">
+              Choose a fictional building to explore its water bill. Each has
+              six sample statements.
+            </p>
+            <div className="mt-9 grid gap-3 sm:grid-cols-2">
+              {DEMO_BUILDINGS.map((building) => (
+                <button
+                  key={building.id}
+                  type="button"
+                  onClick={() => chooseBuilding(building.id)}
+                  className="group rounded-3xl border border-stroke bg-white p-6 text-left transition hover:border-forest hover:shadow-lg"
+                >
+                  <span className={eyebrow}>
+                    {building.units} homes · {building.periodLabel}
+                  </span>
+                  <span className="mt-3 flex items-center justify-between gap-3 font-display text-xl font-bold">
+                    <span>{building.name}</span>
+                    <ArrowRight
+                      size={19}
+                      className="text-forest transition group-hover:translate-x-1"
+                    />
+                  </span>
+                  <span className="mt-2 block text-xs text-muted">
+                    {building.formulaLabel} · 6 sample statements
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => chooseBuilding("other")}
+              className="mt-4 flex min-h-14 w-full items-center justify-between rounded-2xl border border-dashed border-stroke px-5 text-left text-sm font-semibold hover:border-forest"
+            >
+              My building is not listed <ArrowRight size={17} />
+            </button>
+          </div>
+        )}
+
+        {page === "overview" && emptyBuilding && (
+          <section className={`${panel} no-print mx-auto max-w-2xl`}>
+            <span className={eyebrow}>Your building</span>
+            <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">
+              No shared data yet
+            </h1>
+            <p className="mt-5 text-sm leading-6 text-muted">
+              An unlisted building has no shared statements here. A comparison
+              needs at least three from the same building and month. This demo
+              does not save submissions or send alerts.
+            </p>
+            <div className="mt-6 rounded-2xl bg-mist p-4 text-xs leading-5 text-forest">
+              For real alerts, the live service would need a private database,
+              verified building membership, consent, and an email or
+              notification provider.
+            </div>
+            <button
+              type="button"
+              onClick={reset}
+              className={`${secondary} mt-6`}
+            >
+              Explore sample buildings <ArrowRight size={16} />
+            </button>
+          </section>
+        )}
+
+        {page === "overview" && selectedBuilding && (
           <div className="no-print space-y-5">
             <section className="relative overflow-hidden rounded-[32px] bg-forest px-7 py-9 text-white sm:px-12 sm:py-14">
               <div className="relative z-10 max-w-2xl">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
-                  Your bills. One pattern.
+                  {activeBuilding.name} · {activeBuilding.periodLabel}
                 </span>
                 <h2 className="mt-5 font-display text-4xl font-extrabold leading-[1.08] tracking-[-0.06em] sm:text-6xl">
                   Is your share
@@ -582,7 +748,7 @@ export function SharecheckApp() {
                   Start the check <ArrowRight size={17} />
                 </button>
                 <p className="mt-4 text-xs text-white/60">
-                  No account · About 2 minutes
+                  Synthetic example · About 2 minutes
                 </p>
               </div>
               <div
@@ -601,7 +767,8 @@ export function SharecheckApp() {
               <div className={panel}>
                 <span className={eyebrow}>Participating</span>
                 <strong className="mt-2 block font-display text-2xl font-bold">
-                  {joined ? 6 : 1} / 24
+                  {joined ? activeBuilding.statements.length : 1} /{" "}
+                  {activeBuilding.units}
                 </strong>
                 <span className="text-xs text-muted">Synthetic households</span>
               </div>
@@ -649,7 +816,9 @@ export function SharecheckApp() {
         )}
 
         {page === "statement" && (
-          <div className="no-print grid gap-5 lg:grid-cols-[1.4fr_0.6fr]">
+          <div
+            className={`no-print grid gap-5 ${activeBuilding.id === "maple-court-demo" ? "lg:grid-cols-[1.4fr_0.6fr]" : "mx-auto max-w-3xl"}`}
+          >
             <form onSubmit={confirmStatement} noValidate className={panel}>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -693,7 +862,7 @@ export function SharecheckApp() {
                   label="Month"
                   value={fields.period}
                   onChange={(value) => updateField("period", value)}
-                  hint="October 2026 only"
+                  hint={`${activeBuilding.periodLabel} only`}
                 />
               </div>
               <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-6">
@@ -710,50 +879,52 @@ export function SharecheckApp() {
                 </button>
               </div>
             </form>
-            <aside className={`${panel} h-fit`}>
-              <span className={eyebrow}>Optional PDF</span>
-              <h3 className="mt-2 font-display text-lg font-bold">
-                Read it locally
-              </h3>
-              <p className="mt-2 text-xs leading-5 text-muted">
-                Text PDFs only. Your file stays in this browser.
-              </p>
-              <input
-                ref={fileInput}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                aria-label="Choose a PDF statement"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void readFile(file);
-                }}
-              />
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => fileInput.current?.click()}
-                  className={secondary}
+            {activeBuilding.id === "maple-court-demo" && (
+              <aside className={`${panel} h-fit`}>
+                <span className={eyebrow}>Optional PDF</span>
+                <h3 className="mt-2 font-display text-lg font-bold">
+                  Read it locally
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-muted">
+                  Text PDFs only. Your file stays in this browser.
+                </p>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  aria-label="Choose a PDF statement"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void readFile(file);
+                  }}
+                />
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => fileInput.current?.click()}
+                    className={secondary}
+                  >
+                    <Upload size={15} /> {loading ? "Reading…" : "Choose PDF"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={loadSample}
+                    className={secondary}
+                  >
+                    Use sample
+                  </button>
+                </div>
+                <a
+                  href="/samples/maple-court-statement.pdf"
+                  download
+                  className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-forest hover:underline"
                 >
-                  <Upload size={15} /> {loading ? "Reading…" : "Choose PDF"}
-                </button>
-                <button
-                  type="button"
-                  onClick={loadSample}
-                  className={secondary}
-                >
-                  Use sample
-                </button>
-              </div>
-              <a
-                href="/samples/maple-court-statement.pdf"
-                download
-                className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-forest hover:underline"
-              >
-                Download sample <Download size={14} />
-              </a>
-            </aside>
+                  Download sample <Download size={14} />
+                </a>
+              </aside>
+            )}
           </div>
         )}
 
@@ -908,13 +1079,15 @@ export function SharecheckApp() {
                     />
                   </div>
                 </details>
-                <a
-                  href="/samples/maple-court-addendum.pdf"
-                  download
-                  className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-forest hover:underline"
-                >
-                  Sample addendum <Download size={14} />
-                </a>
+                {activeBuilding.id === "maple-court-demo" && (
+                  <a
+                    href="/samples/maple-court-addendum.pdf"
+                    download
+                    className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-forest hover:underline"
+                  >
+                    Sample addendum <Download size={14} />
+                  </a>
+                )}
               </>
             )}
             <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stroke pt-6">
@@ -953,7 +1126,9 @@ export function SharecheckApp() {
                   <strong className="block font-display text-2xl">
                     {joined ? 6 : 1}
                   </strong>
-                  <span className="text-[11px] text-muted">of 24</span>
+                  <span className="text-[11px] text-muted">
+                    of {activeBuilding.units}
+                  </span>
                 </div>
               </div>
               {!joined ? (
@@ -1004,15 +1179,18 @@ export function SharecheckApp() {
                         }}
                         className="size-4 accent-forest"
                       />{" "}
-                      Include $2,400 demo master bill
+                      Include {formatMoney(activeBuilding.masterBillCents)} demo
+                      master bill
                     </label>
-                    <a
-                      href="/samples/maple-court-master-bill.pdf"
-                      download
-                      className="text-xs font-semibold text-forest hover:underline"
-                    >
-                      View bill ↗
-                    </a>
+                    {activeBuilding.id === "maple-court-demo" && (
+                      <a
+                        href="/samples/maple-court-master-bill.pdf"
+                        download
+                        className="text-xs font-semibold text-forest hover:underline"
+                      >
+                        View bill ↗
+                      </a>
+                    )}
                   </div>
                   <div className="mt-6 flex flex-wrap items-center gap-3">
                     <button
@@ -1056,12 +1234,15 @@ export function SharecheckApp() {
                   result={detective}
                   compact
                   onAdd={() => go("formula")}
+                  viewerId={activeBuilding.viewerId}
                 />
                 {complete && vacancy && (
                   <VacancyInsight
                     result={vacancy}
                     shifted={shiftedVacancies}
                     onToggle={() => setShiftedVacancies((current) => !current)}
+                    masterBill={activeBuilding.masterBillCents / 100}
+                    vacantCount={activeBuilding.vacantUnits.length}
                   />
                 )}
               </div>
@@ -1160,6 +1341,8 @@ export function SharecheckApp() {
                 shiftedVacancies,
               })}
               result={result}
+              buildingName={activeBuilding.name}
+              periodLabel={activeBuilding.periodLabel}
               own={own}
               statement={statement}
               rule={effectiveRule}

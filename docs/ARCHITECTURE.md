@@ -24,7 +24,7 @@ No record is sent to a backend. No session is stored in localStorage, cookies, o
 
 The interface uses Tailwind CSS utilities in the React components. `globals.css` contains only the Tailwind import, self-hosted fonts, theme tokens, focus styles, and print rules. The six views use a compact header and reveal detailed calculations only in the report.
 
-The client contains all synthetic fixtures. UI privacy in a demo does **not** provide confidentiality for real residents. A production implementation must move the cohort and calculation to an authorized server.
+The client contains four fictional building fixtures with six statements each. The building chooser gates the calculation journey. An unlisted building enters an empty state and cannot access a fabricated comparison. UI privacy in a demo does **not** provide confidentiality for real residents. A production implementation must move the cohort and calculation to an authorized server.
 
 ## Calculation contract
 
@@ -60,7 +60,7 @@ The building letter uses aggregate counts and findings, never neighbour names or
 
 ## Interface state
 
-Six views form one client-side journey, including report verification. Submitted statement data is separate from draft field strings. Every input change invalidates the previous check and report unlock. A result is always derived from the current confirmed statement, rule, participation state, and optional master bill. No stale saved result is reused.
+Six views form one client-side journey, including report verification. A building selection loads its own rule, viewer row, cohort, master bill, and vacancy model; switching buildings clears participation and reports. Submitted statement data is separate from draft field strings. Every input change invalidates the previous check and report unlock. A result is always derived from the current confirmed statement, rule, participation state, and optional master bill. No stale saved result is reused.
 
 The report’s letter is editable session state. Changing audited inputs remounts the report with a newly generated letter. Refresh resets the complete demonstration. Room links do not serialize financial data.
 
@@ -79,6 +79,8 @@ Membership and independently established household identity are needed in additi
 Default deny via row-level security. A resident may create/read/update/delete only their own active submission and reports. Authorized server aggregation reads the eligible cohort and returns only the requester’s row, limited evidence counts, and approved aggregate values. Never expose raw records through general list endpoints or client service-role keys.
 
 Aggregate counts and medians can still leak information in small rooms, especially through repeated additions/removals. The mathematical minimum of 3 is not a complete privacy policy. Before real data: define independent participation checks, a separate publication threshold, delayed/coarsened aggregates, anti-differencing controls, and tests against inference attacks.
+
+Keep one website with two data states: empty until a building and month pass the pilot's publication threshold, then show a report computed on the server. A notification waitlist would need an opt-in contact record linked to a verified building, a threshold-triggered job, an email provider, unsubscribe and deletion actions, and strict separation from bill submissions. The static demo collects no contact details and sends no alerts.
 
 Original documents, if needed, belong in private object storage with scoped signed URLs, explicit retention limits, owner deletion, and no document text in application logs. Storage paths and metadata must not expose names or account numbers. Server extraction credentials are runtime secrets.
 

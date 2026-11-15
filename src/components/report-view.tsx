@@ -25,6 +25,8 @@ const smallLabel =
 
 export function AuditReport({
   result,
+  buildingName,
+  periodLabel,
   own,
   statement,
   rule,
@@ -38,6 +40,8 @@ export function AuditReport({
   onVerify,
 }: {
   result: ConclusiveResult;
+  buildingName: string;
+  periodLabel: string;
   own: ResidentResult;
   statement: Statement;
   rule: Rule;
@@ -51,7 +55,10 @@ export function AuditReport({
   onVerify: () => void;
 }) {
   const [personalLetter, setPersonalLetter] = useState(() =>
-    managerLetter(statement, own, rule, result.consensusCents),
+    managerLetter(statement, own, rule, result.consensusCents, {
+      buildingName,
+      periodLabel,
+    }),
   );
   const [collectiveLetter, setCollectiveLetter] = useState("");
   const [letterType, setLetterType] = useState<"personal" | "collective">(
@@ -64,8 +71,8 @@ export function AuditReport({
     if (!collectiveLetter)
       setCollectiveLetter(
         buildingLetter({
-          buildingName: "Maple Court Apartments (DEMO)",
-          period: "October 2026",
+          buildingName: `${buildingName} (DEMO)`,
+          period: periodLabel,
           households: result.residents.length,
           flaggedCount: result.residents.filter((resident) => resident.flagged)
             .length,
@@ -97,10 +104,10 @@ export function AuditReport({
         <div>
           <span className={smallLabel}>Your report · synthetic demo</span>
           <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            October water check
+            {periodLabel} water check
           </h2>
           <p className="mt-1 text-xs text-muted">
-            Maple Court · {reportCode || "Calculating code…"}
+            {buildingName} · {reportCode || "Calculating code…"}
           </p>
         </div>
         {unlocked && (

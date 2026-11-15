@@ -22,10 +22,12 @@ export function FormulaInsight({
   result,
   compact,
   onAdd,
+  viewerId = "r4",
 }: {
   result: DetectiveResult;
   compact: boolean;
   onAdd: () => void;
+  viewerId?: string;
 }) {
   const found = result.status === "found";
   return (
@@ -69,11 +71,11 @@ export function FormulaInsight({
             </span>
             <span>{result.best.outliers.length} flagged</span>
           </div>
-          {result.best.outliers.find((item) => item.id === "r4") && (
+          {result.best.outliers.find((item) => item.id === viewerId) && (
             <p className="mt-3 text-xs text-ink">
               Your charge is{" "}
               {money(
-                result.best.outliers.find((item) => item.id === "r4")!
+                result.best.outliers.find((item) => item.id === viewerId)!
                   .excessPerMonth,
               )}{" "}
               above this pattern.
@@ -116,10 +118,14 @@ export function VacancyInsight({
   result,
   shifted,
   onToggle,
+  masterBill,
+  vacantCount,
 }: {
   result: VacancyCheckResult;
   shifted: boolean;
   onToggle: () => void;
+  masterBill: number;
+  vacantCount: number;
 }) {
   return (
     <section className={panel}>
@@ -170,7 +176,7 @@ export function VacancyInsight({
       <p className="mt-2 text-[11px] leading-5 text-muted">
         {shifted
           ? "What-if only; this is not an observed finding."
-          : "Uses the $2,400 synthetic master bill and 3 vacant units."}
+          : `Uses the ${money(masterBill)} synthetic master bill and ${vacantCount} vacant units.`}
       </p>
     </section>
   );

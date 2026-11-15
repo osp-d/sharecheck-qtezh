@@ -9,10 +9,62 @@ import {
 } from "../src/lib/audit";
 import {
   BUILDING,
+  DEMO_BUILDINGS,
   DEMO_RULE,
   DEMO_STATEMENTS,
   YOUR_STATEMENT,
 } from "../src/lib/demo";
+import { detectFormula } from "../src/lib/insights";
+
+test("each fictional building yields its intended comparison and master-bill match", () => {
+  const expected = [
+    ["maple-court-demo", "inconsistent", 2250],
+    ["birch-gardens-demo", "inconsistent", 1500],
+    ["riverstone-lofts-demo", "consistent", 0],
+    ["cedar-point-demo", "inconsistent", 2500],
+  ] as const;
+  for (const [id, status, difference] of expected) {
+    const building = DEMO_BUILDINGS.find((item) => item.id === id)!;
+    const result = conclusive(
+      buildingCheck({
+        buildingId: building.id,
+        period: building.period,
+        rule: building.rule,
+        statements: building.statements,
+        masterBillCents: building.masterBillCents,
+      }),
+    );
+    assert.equal(result.status, status, id);
+    assert.equal(
+      result.residents.find((item) => item.householdId === building.viewerId)
+        ?.differenceCents,
+      difference,
+      id,
+    );
+    assert.equal(result.masterCheck?.matches, true, id);
+  }
+});
+
+test("formula detective resolves each seeded building after neighbours join", () => {
+  const expectedBases = [
+    ["sqft", "occupants"],
+    ["units"],
+    ["sqft"],
+    ["bedrooms"],
+  ];
+  DEMO_BUILDINGS.forEach((building, index) => {
+    const result = detectFormula(
+      building.statements.map((item) => ({
+        id: item.householdId,
+        unit: item.factors,
+        utilityCharge: item.utilityCents / 100,
+      })),
+    );
+    assert.equal(result.status, "found", building.id);
+    if (result.status === "found")
+      assert.deepEqual(result.best.bases, expectedBases[index], building.id);
+  });
+});
 
 function fixture(): AuditInput {
   return structuredClone({
