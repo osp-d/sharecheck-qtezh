@@ -16,6 +16,13 @@ const money = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     n,
   );
+const rate = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(n);
 const signed = (n: number) => `${n < 0 ? "−" : "+"}${money(Math.abs(n))}`;
 
 export function FormulaInsight({
@@ -51,7 +58,7 @@ export function FormulaInsight({
             {result.best.bases.map((basis, index) => (
               <span key={basis}>
                 {index > 0 && <span className="mr-2 text-muted">+</span>}
-                {money(result.best.rates[basis])}
+                {rate(result.best.rates[basis])}
                 <span className="ml-1 font-sans text-xs font-medium tracking-normal text-muted">
                   /{" "}
                   {basis === "sqft"
@@ -75,10 +82,16 @@ export function FormulaInsight({
             <p className="mt-3 text-xs text-ink">
               Your charge is{" "}
               {money(
-                result.best.outliers.find((item) => item.id === viewerId)!
-                  .excessPerMonth,
+                Math.abs(
+                  result.best.outliers.find((item) => item.id === viewerId)!
+                    .excessPerMonth,
+                ),
               )}{" "}
-              above this pattern.
+              {result.best.outliers.find((item) => item.id === viewerId)!
+                .excessPerMonth >= 0
+                ? "above"
+                : "below"}{" "}
+              this pattern.
             </p>
           )}
         </>

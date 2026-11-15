@@ -169,8 +169,9 @@ export function independentCheck(input: IndependentInput): IndependentResult {
         "The allocation formula and factors applied to my apartment",
       ]),
     };
-  const eligiblePoolCents =
-    input.masterBillCents! * (1 - input.commonAreaFraction!);
+  const eligiblePoolCents = Math.round(
+    input.masterBillCents! * (1 - input.commonAreaFraction!),
+  );
   const expectedCents = Math.round(share * eligiblePoolCents);
   if (expectedCents <= 0)
     return {

@@ -38,6 +38,8 @@ For Maple Court, the **$112.50** utility charge compares with a **$90.00** estim
 
 The comparison identifies a **calculation discrepancy**, not proof of unfair or unlawful billing. A small agreeing sample cannot verify the building's actual utility cost. The report explains these limits.
 
+The formulas, sample amounts, and business-plan arithmetic are checked in the [calculation audit](docs/MATH_AUDIT.md).
+
 ## Demo limits
 
 This is a **single-browser demo**, not a live resident service. The independent check accepts actual values but does not authenticate the documents or determine whether a charge is lawful. Refresh clears bill edits and the current selection. Only a saved fictional building ID persists in localStorage, and it can be removed in the Moving view. No bill or contact details are persisted. Invitation links open independent synthetic sessions. The moving history is fictional and does not update from residents.

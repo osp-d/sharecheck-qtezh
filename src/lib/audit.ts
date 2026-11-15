@@ -174,11 +174,35 @@ export function buildingCheck(input: AuditInput): AuditResult {
       }
     }
   }
+  for (const key of FACTORS) {
+    if (rule.weights[key] <= 0 || !finitePositive(rule.totals[key])) continue;
+    const observedTotal = statements.reduce(
+      (sum, statement) => sum + statement.factors[key],
+      0,
+    );
+    if (
+      Number.isFinite(observedTotal) &&
+      observedTotal > rule.totals[key] + 1e-8
+    )
+      reasons.push(
+        `The participating households' ${key} exceed the disclosed building total.`,
+      );
+  }
   if (
     input.masterBillCents !== undefined &&
     (!money(input.masterBillCents) || input.masterBillCents === 0)
   ) {
     reasons.push("The master bill must be a positive amount in cents.");
+  }
+  if (
+    input.masterBillCents !== undefined &&
+    money(input.masterBillCents) &&
+    Number.isFinite(rule.commonAreaFraction) &&
+    rule.commonAreaFraction >= 0 &&
+    rule.commonAreaFraction < 1 &&
+    Math.round(input.masterBillCents * (1 - rule.commonAreaFraction)) <= 0
+  ) {
+    reasons.push("The master bill leaves no positive eligible water pool.");
   }
   if (reasons.length)
     return { status: "insufficient", reasons: [...new Set(reasons)] };
@@ -220,22 +244,27 @@ export function buildingCheck(input: AuditInput): AuditResult {
     poolCents === undefined
       ? undefined
       : (consensusCents - poolCents) / poolCents;
+  const masterCheck =
+    poolCents === undefined
+      ? null
+      : {
+          poolCents,
+          deviation: masterDeviation!,
+          matches: Math.abs(masterDeviation!) <= TOLERANCE + 1e-10,
+        };
   return {
-    status: residents.some((r) => r.flagged) ? "inconsistent" : "consistent",
+    status:
+      residents.some((r) => r.flagged) ||
+      (masterCheck !== null && !masterCheck.matches)
+        ? "inconsistent"
+        : "consistent",
     consensusCents,
     residents,
     documentCount: statements.filter((s) => s.evidence === "document-attached")
       .length,
     selfReportedCount: statements.filter((s) => s.evidence === "self-reported")
       .length,
-    masterCheck:
-      poolCents === undefined
-        ? null
-        : {
-            poolCents,
-            deviation: masterDeviation!,
-            matches: Math.abs(masterDeviation!) <= TOLERANCE + 1e-10,
-          },
+    masterCheck,
   };
 }
 

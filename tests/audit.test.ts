@@ -113,7 +113,7 @@ test("master bill subtracts common areas once, not from each resident twice", ()
   });
   assert.equal(result.residents[3].differenceCents, 2250);
 });
-test("evenly inflated pool passes consistency but fails master bill cross-check", () => {
+test("uniformly inflated neighbour bills still trigger the master bill check", () => {
   const input = fixture();
   input.statements[3].utilityCents = 9000;
   input.statements.forEach((s) => {
@@ -121,8 +121,29 @@ test("evenly inflated pool passes consistency but fails master bill cross-check"
   });
   input.masterBillCents = 240000;
   const result = conclusive(buildingCheck(input));
-  assert.equal(result.status, "consistent");
+  assert.equal(result.status, "inconsistent");
+  assert.ok(result.residents.every((resident) => !resident.flagged));
   assert.equal(result.masterCheck?.matches, false);
+  assert.ok(Math.abs(result.masterCheck!.deviation - 0.2) < 1e-10);
+});
+test("participating factors cannot exceed disclosed building totals", () => {
+  const input = fixture();
+  input.rule.totals.occupants = 10;
+  const result = buildingCheck(input);
+  assert.equal(result.status, "insufficient");
+  if (result.status === "insufficient")
+    assert.ok(
+      result.reasons.some((reason) =>
+        reason.includes("exceed the disclosed building total"),
+      ),
+    );
+});
+test("a master bill that rounds to no eligible cents cannot be compared", () => {
+  const input = fixture();
+  input.masterBillCents = 1;
+  input.rule.commonAreaFraction = 0.9;
+  const result = buildingCheck(input);
+  assert.equal(result.status, "insufficient");
 });
 test("one or two households never produce a building verdict", () => {
   for (const count of [0, 1, 2]) {

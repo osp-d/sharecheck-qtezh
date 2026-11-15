@@ -467,7 +467,7 @@ export function IndependentCheck() {
           </h3>
           <p className="mt-2 text-sm text-muted">
             {result.flagged
-              ? `${formatPercent(Math.abs(result.deviation), 0)} ${result.differenceCents > 0 ? "above" : "below"} the calculated amount.`
+              ? `${formatPercent(Math.abs(result.deviation), 2)} ${result.differenceCents > 0 ? "above" : "below"} the calculated amount.`
               : "Within the 2% prototype tolerance."}{" "}
             Check the source documents before acting.
           </p>

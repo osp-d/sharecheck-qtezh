@@ -235,6 +235,8 @@ export function SharecheckApp() {
         (resident) => resident.householdId === activeBuilding.viewerId,
       )!
     : null;
+  const masterCheck = conclusive ? result.masterCheck : null;
+  const masterMismatch = masterCheck !== null && !masterCheck.matches;
   const complete = checked && conclusive;
   const vacancyRule = {
     components: FACTORS.filter(
@@ -243,12 +245,20 @@ export function SharecheckApp() {
     buildingTotals: effectiveRule.totals,
   };
   const vacantUnits = activeBuilding.vacantUnits;
-  const simulatedVacancyPool =
-    ((activeBuilding.masterBillCents / 100) *
-      (1 - effectiveRule.commonAreaFraction)) /
-    (1 - vacantShare(vacancyRule, vacantUnits));
+  const vacancyFraction = vacantShare(vacancyRule, vacantUnits);
+  const vacancyInputsValid =
+    Number.isFinite(vacancyFraction) &&
+    vacancyFraction >= 0 &&
+    vacancyFraction < 1;
+  const simulatedVacancyPool = vacancyInputsValid
+    ? Math.round(
+        activeBuilding.masterBillCents * (1 - effectiveRule.commonAreaFraction),
+      ) /
+      100 /
+      (1 - vacancyFraction)
+    : null;
   const vacancy =
-    complete && conclusive && own
+    complete && conclusive && own && simulatedVacancyPool !== null
       ? vacancyCheck({
           consensusPool: shiftedVacancies
             ? simulatedVacancyPool
@@ -948,7 +958,9 @@ export function SharecheckApp() {
                   {complete
                     ? own?.flagged
                       ? "Review flagged"
-                      : "Consistent"
+                      : masterMismatch
+                        ? "Review master bill"
+                        : "Matches neighbours"
                     : "Ready to check"}
                 </strong>
                 <button
@@ -1445,12 +1457,16 @@ export function SharecheckApp() {
                       <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
                         {own.flagged
                           ? `${formatMoney(Math.abs(own.differenceCents))} difference`
-                          : "Your charge matches"}
+                          : masterMismatch
+                            ? "Review the building total"
+                            : "Matches neighbour pattern"}
                       </h2>
                       <p className="mt-2 max-w-lg text-sm text-white/70">
                         {own.flagged
-                          ? `${formatPercent(Math.abs(own.deviation), 0)} ${own.deviation > 0 ? "above" : "below"} the building consensus.`
-                          : "Within the 2% comparison tolerance."}
+                          ? `${formatPercent(Math.abs(own.deviation), 2)} ${own.deviation > 0 ? "above" : "below"} the building consensus.`
+                          : masterMismatch
+                            ? "Neighbour charges agree, but the implied pool differs from the eligible master bill."
+                            : "Within the 2% neighbour comparison tolerance."}
                       </p>
                     </div>
                     <button
@@ -1476,6 +1492,23 @@ export function SharecheckApp() {
                     ))}
                   </div>
                 </section>
+                {masterMismatch && masterCheck && (
+                  <section
+                    role="status"
+                    className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
+                  >
+                    <strong>Master bill mismatch</strong>
+                    <p className="mt-2">
+                      Neighbour charges imply{" "}
+                      {formatMoney(result.consensusCents)}; the eligible master
+                      bill is {formatMoney(masterCheck.poolCents)}. The gap is{" "}
+                      {formatMoney(
+                        Math.abs(result.consensusCents - masterCheck.poolCents),
+                      )}
+                      . Ask the manager to reconcile the inputs.
+                    </p>
+                  </section>
+                )}
                 <ChangeInsight result={change} />
               </>
             )}

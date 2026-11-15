@@ -63,6 +63,10 @@ export function AuditReport({
     managerLetter(statement, own, rule, result.consensusCents, {
       buildingName,
       periodLabel,
+      masterPoolCents:
+        result.masterCheck && !result.masterCheck.matches
+          ? result.masterCheck.poolCents
+          : undefined,
     }),
   );
   const [collectiveLetter, setCollectiveLetter] = useState("");
@@ -76,6 +80,8 @@ export function AuditReport({
   const order = demoOrder(codeApplied ? accessCode : "");
   const activeLetter =
     letterType === "personal" ? personalLetter : collectiveLetter;
+  const masterMismatch =
+    result.masterCheck !== null && !result.masterCheck.matches;
 
   function openCollective() {
     if (!collectiveLetter)
@@ -87,6 +93,10 @@ export function AuditReport({
           flaggedCount: result.residents.filter((resident) => resident.flagged)
             .length,
           consensusPool: result.consensusCents / 100,
+          masterPool:
+            result.masterCheck && !result.masterCheck.matches
+              ? result.masterCheck.poolCents / 100
+              : undefined,
           formula:
             formula.status === "found"
               ? { bases: formula.best.bases, rates: formula.best.rates }
@@ -133,19 +143,27 @@ export function AuditReport({
 
       <section className={`${panel} print-break-avoid`}>
         <span
-          className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${own.flagged ? "bg-amber-50 text-amber-800" : "bg-mist text-forest"}`}
+          className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${own.flagged || masterMismatch ? "bg-amber-50 text-amber-800" : "bg-mist text-forest"}`}
         >
-          {own.flagged ? "Review this charge" : "Within 2% tolerance"}
+          {own.flagged
+            ? "Review this charge"
+            : masterMismatch
+              ? "Review building total"
+              : "Matches neighbour pattern"}
         </span>
         <h3 className="mt-5 font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {own.flagged
             ? `${formatMoney(Math.abs(own.differenceCents))} difference`
-            : "Your share looks consistent"}
+            : masterMismatch
+              ? "Neighbour charges agree; master bill differs"
+              : "Your share matches the neighbour pattern"}
         </h3>
         <p className="mt-2 text-sm text-muted">
           {own.flagged
-            ? `${formatPercent(Math.abs(own.deviation), 0)} ${own.deviation > 0 ? "above" : "below"} the building consensus. Ask the manager to confirm the inputs.`
-            : "The participating bills point to a similar allocation."}
+            ? `${formatPercent(Math.abs(own.deviation), 2)} ${own.deviation > 0 ? "above" : "below"} the building consensus. Ask the manager to confirm the inputs.`
+            : masterMismatch
+              ? "The shared allocation pattern does not reconcile with the eligible master bill."
+              : "The participating bills point to a similar allocation."}
         </p>
         <div className="mt-7 grid gap-3 border-t border-stroke pt-5 sm:grid-cols-3">
           {[
@@ -162,6 +180,25 @@ export function AuditReport({
           ))}
         </div>
       </section>
+
+      {masterMismatch && result.masterCheck && (
+        <section
+          className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
+          role="status"
+        >
+          <strong>Master bill mismatch</strong>
+          <p className="mt-2">
+            Neighbour charges imply {formatMoney(result.consensusCents)}; the
+            eligible master pool is {formatMoney(result.masterCheck.poolCents)}.
+            The gap is{" "}
+            {formatMoney(
+              Math.abs(result.consensusCents - result.masterCheck.poolCents),
+            )}
+            . Confirm the master bill, deduction, and allocation before drawing
+            a conclusion.
+          </p>
+        </section>
+      )}
 
       {unlocked && (
         <div
@@ -426,7 +463,11 @@ export function AuditReport({
                   ["Self-reported", result.selfReportedCount],
                   [
                     "Master bill",
-                    result.masterCheck ? "Included" : "Not included",
+                    result.masterCheck
+                      ? result.masterCheck.matches
+                        ? "Matches implied pool"
+                        : "Mismatch"
+                      : "Not included",
                   ],
                 ].map(([name, value]) => (
                   <div

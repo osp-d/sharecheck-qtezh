@@ -28,7 +28,7 @@ The client contains four fictional building fixtures with six statements each. T
 
 ## Calculation contract
 
-The independent check uses `eligiblePool = masterBill × (1 − commonAreaFraction)` and `expected = roundToCents(share × eligiblePool)`, where share uses the disclosed factor weights and building totals below. It requires a positive water charge, matching statement and master-bill months, weights totaling 100%, valid active factors and totals, and an explicit deduction value (including 0%). A missing document yields an evidence checklist and draft letter. Its 2% flag is a prototype tolerance, not a legal threshold. The separate billing fee does not enter the calculation. Unlike the neighbour median, this path does not need a cohort; its accuracy depends on the entered documents.
+The independent check uses `eligiblePool = roundToCents(masterBill × (1 − commonAreaFraction))` and `expected = roundToCents(share × eligiblePool)`, where share uses the disclosed factor weights and building totals below. It requires a positive water charge, matching statement and master-bill months, weights totaling 100%, valid active factors and totals, and an explicit deduction value (including 0%). A missing document yields an evidence checklist and draft letter. Its 2% flag is a prototype tolerance, not a legal threshold. The separate billing fee does not enter the calculation. Unlike the neighbour median, this path does not need a cohort; its accuracy depends on the entered documents.
 
 For each active factor `f`:
 
@@ -46,9 +46,9 @@ Flag when `abs(deviation) > 0.02`. The threshold is a prototype product assumpti
 
 Input money is integer cents. Ratios are unrounded JavaScript numbers; comparison includes a tiny floating-point guard at the exact threshold. Only the final expected charge is rounded to cents. This avoids rounding percentage shares before doing the calculation. The displayed share is illustrative and may be rounded.
 
-The optional master cross-check uses `masterBill × (1 − commonAreaFraction)` once. It does not deduct common areas from neighbour charges again. Billing fees stay outside the utility pool and may need a separate disclosure check.
+The optional master cross-check uses `roundToCents(masterBill × (1 − commonAreaFraction))` once. It does not deduct common areas from neighbour charges again. A mismatch beyond 2% makes the overall building result inconsistent even when the participating household charges agree with one another. Billing fees stay outside the utility pool and may need a separate disclosure check.
 
-Validation rejects incomplete active totals, invalid weights, missing factors, duplicate household IDs, incompatible cohorts, invalid amounts, and zero consensus. Three households is a minimum sample rule; it does not establish authenticity, representativeness, or adequate production privacy. Half or more unreliable entries can defeat the median. Even universal agreement cannot validate an inflated actual building cost.
+Validation rejects incomplete active totals, invalid weights, missing factors, participating factors that exceed disclosed building totals, duplicate household IDs, incompatible cohorts, invalid amounts, a zero eligible master pool, and zero consensus. Three households is a minimum sample rule; it does not establish authenticity, representativeness, or adequate production privacy. Half or more unreliable entries can defeat the median. Even universal agreement cannot validate an inflated actual building cost without a trustworthy master bill.
 
 ## Insight contract
 

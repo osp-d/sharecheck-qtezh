@@ -84,3 +84,19 @@ test("a fully disclosed equal split is computable without unused factor totals",
   assert.equal(result.status, "calculated");
   if (result.status === "calculated") assert.equal(result.expectedCents, 10000);
 });
+
+test("rounds the eligible master pool to cents before allocating it", () => {
+  const result = independentCheck({
+    ...maple,
+    chargeCents: 22,
+    masterBillCents: 101,
+    commonAreaFraction: 0.15,
+    weights: { units: 1 },
+    totals: { units: 4 },
+    factors: { units: 1 },
+  });
+  assert.equal(result.status, "calculated");
+  if (result.status !== "calculated") return;
+  assert.equal(result.eligiblePoolCents, 86);
+  assert.equal(result.expectedCents, 22);
+});

@@ -14,7 +14,12 @@ import {
 
 // Same synthetic building as the demo: 24 units, 21,600 sq ft, 48 occupants,
 // 50% sq ft / 50% occupants on a $2,160 pool => $0.05 per sq ft + $22.50 per occupant.
-const u = (sqft: number, occupants: number, bedrooms: number) => ({ sqft, occupants, bedrooms, units: 1 });
+const u = (sqft: number, occupants: number, bedrooms: number) => ({
+  sqft,
+  occupants,
+  bedrooms,
+  units: 1,
+});
 const DEMO: Observation[] = [
   { id: "r1", unit: u(650, 1, 1), utilityCharge: 55.0 },
   { id: "r2", unit: u(900, 2, 2), utilityCharge: 90.0 },
@@ -38,7 +43,10 @@ test("F1 recovers the undisclosed formula and flags r4 without being told the fo
   assert.deepEqual(r.best.bases, ["sqft", "occupants"]);
   assert.equal(r.best.rates.sqft, 0.05);
   assert.equal(r.best.rates.occupants, 22.5);
-  assert.deepEqual(r.best.outliers.map((o) => o.id), ["r4"]);
+  assert.deepEqual(
+    r.best.outliers.map((o) => o.id),
+    ["r4"],
+  );
   assert.equal(r.best.outliers[0].expected, 90);
   assert.equal(r.best.outliers[0].excessPerMonth, 22.5);
 });
@@ -53,28 +61,63 @@ test("F1 turns rates back into the lease-style 50/50 split when totals are known
 });
 
 test("F1 keeps inferred weights precise enough to sum to one", () => {
-  const inferred = ratesToWeights({ sqft: 0.071, occupants: 19.17 }, RULE.buildingTotals);
+  const inferred = ratesToWeights(
+    { sqft: 0.071, occupants: 19.17 },
+    RULE.buildingTotals,
+  );
   assert.ok(inferred);
-  assert.ok(Math.abs(Object.values(inferred.weights).reduce((sum, weight) => sum + weight, 0) - 1) < 1e-12);
+  assert.ok(
+    Math.abs(
+      Object.values(inferred.weights).reduce((sum, weight) => sum + weight, 0) -
+        1,
+    ) < 1e-12,
+  );
 });
 
 test("F1 prefers the simpler formula when it fits", () => {
-  const perOccupant = DEMO.map((o) => ({ ...o, utilityCharge: 40 * o.unit.occupants }));
+  const perOccupant = DEMO.map((o) => ({
+    ...o,
+    utilityCharge: 40 * o.unit.occupants,
+  }));
   const r = detectFormula(perOccupant);
   assert.equal(r.status, "found");
   if (r.status === "found") assert.deepEqual(r.best.bases, ["occupants"]);
 });
 
+test("F1 uses expected charge as the 2% comparison denominator", () => {
+  const observations: Observation[] = Array.from(
+    { length: 22 },
+    (_, index) => ({
+      id: `household-${index}`,
+      unit: u(600 + index * 20, 1 + (index % 3), 1 + (index % 2)),
+      utilityCharge: index === 21 ? 102.1 : 100,
+    }),
+  );
+  const result = detectFormula(observations);
+  assert.equal(result.status, "found");
+  if (result.status !== "found") return;
+  assert.deepEqual(result.best.bases, ["units"]);
+  assert.equal(result.best.outliers[0].id, "household-21");
+  assert.equal(result.best.outliers[0].deviationPct, 2.1);
+});
+
 test("F1 refuses below 4 households and reports ambiguity instead of guessing", () => {
   assert.equal(detectFormula(DEMO.slice(0, 3)).status, "insufficient_data");
   // sq ft exactly 400 × bedrooms: the two formulas cannot be told apart
-  const twins = [1, 2, 3, 2].map((b, i) => ({ id: `t${i}`, unit: u(400 * b, 1, b), utilityCharge: 30 * b }));
+  const twins = [1, 2, 3, 2].map((b, i) => ({
+    id: `t${i}`,
+    unit: u(400 * b, 1, b),
+    utilityCharge: 30 * b,
+  }));
   assert.equal(detectFormula(twins).status, "ambiguous");
 });
 
 test("F2 says the landlord absorbs vacancies in the demo building", () => {
   const r = vacancyCheck({
-    consensusPool: 2160, masterBill: 2400, commonAreaDeductionPct: 0.1, rule: RULE,
+    consensusPool: 2160,
+    masterBill: 2400,
+    commonAreaDeductionPct: 0.1,
+    rule: RULE,
     vacantUnits: [u(900, 0, 2), u(900, 0, 2), u(900, 0, 2)],
   });
   assert.equal(r.finding, "landlord_absorbs_vacancies");
@@ -85,8 +128,12 @@ test("F2 detects vacant apartments' share billed to residents", () => {
   const vacant = [u(900, 0, 2), u(900, 0, 2), u(900, 0, 2)];
   const v = vacantShare(RULE, vacant); // 0.5 × 2700/21600 = 6.25%
   const r = vacancyCheck({
-    consensusPool: 2160 / (1 - v), masterBill: 2400, commonAreaDeductionPct: 0.1, rule: RULE,
-    vacantUnits: vacant, yourShare: 1 / 24,
+    consensusPool: 2160 / (1 - v),
+    masterBill: 2400,
+    commonAreaDeductionPct: 0.1,
+    rule: RULE,
+    vacantUnits: vacant,
+    yourShare: 1 / 24,
   });
   assert.equal(r.finding, "vacancies_billed_to_residents");
   assert.equal(r.consensusPool, 2304);
@@ -96,7 +143,11 @@ test("F2 detects vacant apartments' share billed to residents", () => {
 
 test("F2 reports an unexplained pool rather than forcing a cause", () => {
   const r = vacancyCheck({
-    consensusPool: 2500, masterBill: 2400, commonAreaDeductionPct: 0.1, rule: RULE, vacantUnits: [u(900, 0, 2)],
+    consensusPool: 2500,
+    masterBill: 2400,
+    commonAreaDeductionPct: 0.1,
+    rule: RULE,
+    vacantUnits: [u(900, 0, 2)],
   });
   assert.equal(r.finding, "pool_unexplained");
 });
@@ -118,28 +169,76 @@ test("F3 splits a bill change into parts that add up exactly", () => {
 
 test("F3 displayed parts still reconcile when shares create fractional cents", () => {
   const r = explainChange(
-    { period: "October", share: 0.03789, pool: 2160.01, charged: 82.37, fee: 3.95 },
-    { period: "November", share: 0.03817, pool: 2400.03, charged: 104.19, fee: 4.96 },
+    {
+      period: "October",
+      share: 0.03789,
+      pool: 2160.01,
+      charged: 82.37,
+      fee: 3.95,
+    },
+    {
+      period: "November",
+      share: 0.03817,
+      pool: 2400.03,
+      charged: 104.19,
+      fee: 4.96,
+    },
   );
-  assert.equal(Math.round(Object.values(r.parts).reduce((sum, part) => sum + part, 0) * 100), Math.round(r.totalChange * 100));
+  assert.equal(
+    Math.round(
+      Object.values(r.parts).reduce((sum, part) => sum + part, 0) * 100,
+    ),
+    Math.round(r.totalChange * 100),
+  );
 });
 
 test("F4 letter is collective, anonymous and refuses under 3 households", () => {
   const text = buildingLetter({
-    buildingName: "Maple Court Apartments (DEMO)", period: "October 2026", households: 6, flaggedCount: 1,
-    consensusPool: 2160, formula: { bases: ["sqft", "occupants"], rates: { sqft: 0.05, occupants: 22.5 } },
+    buildingName: "Maple Court Apartments (DEMO)",
+    period: "October 2026",
+    households: 6,
+    flaggedCount: 1,
+    consensusPool: 2160,
+    formula: {
+      bases: ["sqft", "occupants"],
+      rates: { sqft: 0.05, occupants: 22.5 },
+    },
     reportCode: "SC-0000-0000-0000",
   });
   assert.match(text, /6 households/);
   assert.match(text, /\$0\.05 per sq ft plus \$22\.50 per occupant/);
   assert.doesNotMatch(text, /r4|unit \d/i);
-  assert.throws(() => buildingLetter({ buildingName: "X", period: "Oct", households: 2, flaggedCount: 0, consensusPool: 1 }));
+  assert.throws(() =>
+    buildingLetter({
+      buildingName: "X",
+      period: "Oct",
+      households: 2,
+      flaggedCount: 0,
+      consensusPool: 1,
+    }),
+  );
+});
+
+test("F4 letter states the master-bill gap when supplied", () => {
+  const letter = buildingLetter({
+    buildingName: "Example (DEMO)",
+    period: "October 2026",
+    households: 6,
+    flaggedCount: 0,
+    consensusPool: 2592,
+    masterPool: 2160,
+  });
+  assert.ok(letter.includes("$432.00 gap"));
 });
 
 test("F5 report code is stable across key order and changes with any input", async () => {
   const a = await reportCode({ rule: RULE, obs: DEMO, period: "2026-10" });
   const b = await reportCode({ period: "2026-10", obs: DEMO, rule: RULE });
-  const c = await reportCode({ rule: RULE, obs: DEMO.map((o) => (o.id === "r4" ? { ...o, utilityCharge: 112.49 } : o)), period: "2026-10" });
+  const c = await reportCode({
+    rule: RULE,
+    obs: DEMO.map((o) => (o.id === "r4" ? { ...o, utilityCharge: 112.49 } : o)),
+    period: "2026-10",
+  });
   assert.match(a, /^SC-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
   assert.equal(a, b);
   assert.notEqual(a, c);
