@@ -186,11 +186,12 @@ export function AuditReport({
           className={`${panel} no-print flex flex-wrap items-center justify-between gap-5`}
         >
           <div>
-            <h3 className="font-display text-lg font-bold">
-              Open the full demo report
+            <span className={smallLabel}>Full report · $4.99 one time</span>
+            <h3 className="mt-2 font-display text-lg font-bold">
+              Calculation and editable letters
             </h3>
             <p className="mt-1 text-xs text-muted">
-              Calculation, evidence and editable letters. No payment.
+              Demo access is free. No payment or account is collected.
             </p>
           </div>
           <button
@@ -198,7 +199,7 @@ export function AuditReport({
             onClick={onUnlock}
             className="min-h-11 rounded-xl bg-forest px-5 text-sm font-semibold text-white hover:bg-ink"
           >
-            Unlock free report
+            Unlock demo report
           </button>
         </section>
       ) : (

@@ -9,11 +9,13 @@ Use synthetic data and start with **Change building**. This is a navigation scri
 | 0:30–0:50 | Consent → **Add demo neighbours** → **Run building check**     | Six synthetic contributions; no neighbour row is shown.                                                                                                                                 |
 | 0:50–1:15 | Show result and Formula Detective                              | Likely rule: $0.05 per sq ft + $22.50 per occupant; five of six match. The viewer is $22.50 above the pattern.                                                                          |
 | 1:15–1:30 | Vacancy card → **Try shifted scenario**                        | Observed sample is consistent with landlord absorption. The what-if shows $2,304 pool, 6.25% vacant share, $135 vacant share of the eligible pool and $6 modeled impact for the viewer. |
-| 1:30–1:50 | **Open report** → **Unlock full report** → **Building letter** | Anonymous request from six participating households, with calculation limits.                                                                                                           |
+| 1:30–1:50 | **Open report** → **Unlock demo report** → **Building letter** | Proposed $4.99 one-time price; demo unlock is free. Anonymous request from six sample households, with calculation limits.                                                              |
 | 1:50–2:00 | **Copy verification bundle** → **Verify code**                 | Pasted snapshot matches its report code; it is a consistency check, not document authentication.                                                                                        |
 
 Optional after the timed run: show **Why did my bill change?** in the room. November is a modeled example based on the viewer's October inputs; the four parts add to the total to the cent. Change the viewer's October charge by one cent, rerun, and show a different report code.
 
 To show the other state, choose **Change building → My building is not listed**. The screen shows no comparison and no alert signup because no shared data or notification backend exists. Birch and Cedar produce different flagged examples; Riverstone produces a consistent example.
+
+To show the moving use case, choose **Moving → Maple Court Apartments**. Three monthly summaries come from separate synthetic statement cohorts. Save the building, refresh, then use **View history** to demonstrate the browser-local return mechanic. Remove the saved building in that view.
 
 For a real pilot, cross-device rooms and private submissions require backend identity, authorization, storage, and server-side aggregation. A real extraction service would need private server credentials; the current PDF extraction stays in the browser.

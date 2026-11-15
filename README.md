@@ -34,6 +34,7 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 - Building chooser → statement → formula → room → result → report; separate report verification screen.
 - Four synthetic buildings with six statements each: Maple Court (area and occupants), Birch Gardens (equal split), Riverstone Lofts (area), and Cedar Point (bedrooms). Three sample viewers have flagged differences; Riverstone's sample viewer is consistent.
 - Unlisted-building state with no invented comparison or notification signup.
+- Moving preview: three synthetic months per listed building, calculated from month-specific statements; save one building for a later visit in this browser.
 - Editable financial inputs and weighted square-foot, occupant, bedroom, and unit formulas.
 - Browser-local text-PDF extraction, with file-size/page limits and manual fallback. This is deterministic extraction, not AI or OCR. Review is mandatory.
 - Building median check, >2% outlier threshold, three-household minimum, and optional master-bill cross-check.
@@ -44,14 +45,16 @@ The PDF worker is copied from the installed `pdfjs-dist` package by the build se
 - Deterministic report code and a paste-and-verify JSON bundle. The bundle contains the viewer's row and a fingerprint of the synthetic cohort, not neighbour rows.
 - Synthetic neighbours added only after explicit demo participation consent.
 - Own statement and aggregate results only; other residents’ rows are never rendered.
-- Evidence provenance, mock paywall, editable manager letter, text download, and print-to-PDF report.
+- Evidence provenance, a $4.99 one-time report price with free demo unlock, editable manager letter, text download, and print-to-PDF report. No payment is taken.
 - Session reset and withdrawal of demo participation.
 
 Maple Court example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool. All amounts are fictional.
 
 ## Deliberate boundaries
 
-This is a **single-browser, in-memory demo**, not a live resident service. Refresh clears edits and building selection. Invitation links open independent synthetic sessions. Evidence counts for neighbours are simulated fixture metadata; no documents are authenticated. There is no live database, cross-device history, email, payments, subscriptions, scheduled monitoring, OCR, or LLM integration. The downloadable PDF statement and master bill are Maple Court examples only; other building figures are prefilled synthetic inputs.
+This is a **single-browser demo**, not a live resident service. Refresh clears bill edits and the current selection. Only a saved building ID persists in this browser's localStorage; it can be removed in the Moving view. No bill or contact details are persisted. Invitation links open independent synthetic sessions. Evidence counts for neighbours are simulated fixture metadata; no documents are authenticated. There is no live database, cross-device history, email, payments, subscriptions, scheduled monitoring, OCR, or LLM integration. The moving history is fictional and stays the same until the demo code changes. The downloadable PDF statement and master bill are Maple Court examples only; other building figures are prefilled synthetic inputs.
+
+The current core is water. Sewer and trash could reuse the shared-cost engine when a building actually allocates them from a common pool, but each needs a separate utility-specific cohort and rule. Individually metered electricity needs a different comparison model and is outside this demo.
 
 For a real "notify me when my building has enough data" flow, collect an email address only after explicit opt-in and a privacy notice. A backend must store a verified building ID, consent, and the contact address separately from submissions, count eligible distinct households by building and month, and send a single threshold alert through an email provider. Residents need a way to unsubscribe and delete their contact data. Publish comparisons only after a privacy threshold chosen for a real pilot; the demo's three-household calculation minimum is not a safe release threshold.
 
@@ -87,6 +90,7 @@ tests/                          Independent arithmetic and parsing cases
 docs/IMPLEMENTATION_PLAN.md      Scope, milestones, acceptance, release checks
 docs/ARCHITECTURE.md             Decisions, privacy model, production design
 docs/DEMO_SCRIPT.md              Two-minute judge walkthrough
+docs/FAQ_REQUIREMENTS.md         Case FAQ audit and submission gap
 ```
 
 Financial calculations and document organisation, not legal advice.

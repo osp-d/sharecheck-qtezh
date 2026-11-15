@@ -20,11 +20,11 @@ flowchart LR
   Report --> Print[Browser print to PDF]
 ```
 
-No record is sent to a backend. No session is stored in localStorage, cookies, or an external database. Third-party fonts are self-hosted. Dependency downloads occur at build time. The static host will still receive ordinary requests for app assets; this is not a claim of anonymous network access.
+No record is sent to a backend. A saved fictional building ID is the only localStorage value; statements, report snapshots, and contact information are not stored. Third-party fonts are self-hosted. Dependency downloads occur at build time. The static host will still receive ordinary requests for app assets; this is not a claim of anonymous network access.
 
 The interface uses Tailwind CSS utilities in the React components. `globals.css` contains only the Tailwind import, self-hosted fonts, theme tokens, focus styles, and print rules. The six views use a compact header and reveal detailed calculations only in the report.
 
-The client contains four fictional building fixtures with six statements each. The building chooser gates the calculation journey. An unlisted building enters an empty state and cannot access a fabricated comparison. UI privacy in a demo does **not** provide confidentiality for real residents. A production implementation must move the cohort and calculation to an authorized server.
+The client contains four fictional building fixtures with six statements each. The building chooser gates the calculation journey. The Moving view computes August, September, and October summaries through the same allocation engine using separate synthetic monthly statements. An unlisted building enters an empty state and cannot access a fabricated comparison or history. UI privacy in a demo does **not** provide confidentiality for real residents. A production implementation must move the cohort and calculation to an authorized server.
 
 ## Calculation contract
 
@@ -86,7 +86,7 @@ Original documents, if needed, belong in private object storage with scoped sign
 
 ## Non-goals for the hackathon
 
-Real payments, legal judgments, authenticated residence verification, production anonymization, generalized OCR, live messages, notifications, arbitrary utilities, and historical monitoring. The UI calls these out rather than simulating a successful real service.
+Real payments, legal judgments, authenticated residence verification, production anonymization, generalized OCR, live messages, notifications, arbitrary utilities, and live historical monitoring. The UI calls these out rather than simulating a successful real service. The report gate displays a proposed $4.99 one-time price; unlocking in this demo is free and no checkout runs.
 
 ## Deployment and verification
 

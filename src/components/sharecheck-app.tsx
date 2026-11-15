@@ -29,6 +29,7 @@ import {
   YOUR_STATEMENT,
   demoCohort,
 } from "@/lib/demo";
+import { demoHistory } from "@/lib/history";
 import {
   detectFormula,
   explainChange,
@@ -131,6 +132,11 @@ export function SharecheckApp() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
     null,
   );
+  const [entryMode, setEntryMode] = useState<"bill" | "moving">("bill");
+  const [previewBuildingId, setPreviewBuildingId] = useState<string | null>(
+    null,
+  );
+  const [savedBuildingId, setSavedBuildingId] = useState<string | null>(null);
   const [fields, setFields] = useState<FieldValues>(INITIAL);
   const [statement, setStatement] = useState<Statement>(YOUR_STATEMENT);
   const [rule, setRule] = useState<Rule>(DEMO_RULE);
@@ -161,6 +167,35 @@ export function SharecheckApp() {
   );
   const activeBuilding = selectedBuilding ?? DEMO_BUILDINGS[0];
   const emptyBuilding = selectedBuildingId === "other";
+  const previewBuilding = DEMO_BUILDINGS.find(
+    (building) => building.id === previewBuildingId,
+  );
+  const savedBuilding = DEMO_BUILDINGS.find(
+    (building) => building.id === savedBuildingId,
+  );
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("sharecheck:saved-building");
+      if (DEMO_BUILDINGS.some((building) => building.id === saved))
+        setSavedBuildingId(saved);
+    } catch {
+      // Browser storage is optional.
+    }
+  }, []);
+
+  function toggleSavedBuilding(id: string) {
+    const next = savedBuildingId === id ? null : id;
+    setSavedBuildingId(next);
+    try {
+      if (next) window.localStorage.setItem("sharecheck:saved-building", next);
+      else window.localStorage.removeItem("sharecheck:saved-building");
+    } catch {
+      setNotice(
+        "Browser storage is unavailable; this save lasts only for this visit.",
+      );
+    }
+  }
 
   const cohort = demoCohort(statement, joined, activeBuilding);
   const observations: Observation[] = cohort.map((item) => ({
@@ -658,19 +693,73 @@ export function SharecheckApp() {
           <div className="no-print mx-auto max-w-5xl">
             <span className={eyebrow}>SHARECHECK · synthetic demo</span>
             <h1 className="mt-3 font-display text-4xl font-extrabold tracking-[-0.06em] sm:text-6xl">
-              Which building is yours?
+              {entryMode === "moving"
+                ? "Check before you move."
+                : "Which building is yours?"}
             </h1>
             <p className="mt-4 max-w-xl text-sm text-muted">
-              Choose a fictional building to explore its water bill. Each has
-              six sample statements.
+              {entryMode === "moving"
+                ? "Explore three months of fictional building history before signing."
+                : "Choose a fictional building to explore its water bill. Each has six sample statements."}
             </p>
+            <div
+              className="mt-6 inline-flex rounded-xl border border-stroke bg-white p-1"
+              role="group"
+              aria-label="Choose a goal"
+            >
+              <button
+                type="button"
+                aria-pressed={entryMode === "bill"}
+                onClick={() => {
+                  setEntryMode("bill");
+                  setPreviewBuildingId(null);
+                }}
+                className={`rounded-lg px-4 py-2.5 text-xs font-semibold ${entryMode === "bill" ? "bg-forest text-white" : "text-muted"}`}
+              >
+                Check my bill
+              </button>
+              <button
+                type="button"
+                aria-pressed={entryMode === "moving"}
+                onClick={() => setEntryMode("moving")}
+                className={`rounded-lg px-4 py-2.5 text-xs font-semibold ${entryMode === "moving" ? "bg-forest text-white" : "text-muted"}`}
+              >
+                Moving
+              </button>
+            </div>
+            {savedBuilding && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mist px-5 py-4 text-sm">
+                <span>
+                  <strong>Saved for later:</strong> {savedBuilding.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryMode("moving");
+                    setPreviewBuildingId(savedBuilding.id);
+                  }}
+                  className="font-semibold text-forest"
+                >
+                  View history →
+                </button>
+              </div>
+            )}
             <div className="mt-9 grid gap-3 sm:grid-cols-2">
               {DEMO_BUILDINGS.map((building) => (
                 <button
                   key={building.id}
                   type="button"
-                  onClick={() => chooseBuilding(building.id)}
-                  className="group rounded-3xl border border-stroke bg-white p-6 text-left transition hover:border-forest hover:shadow-lg"
+                  onClick={() =>
+                    entryMode === "moving"
+                      ? setPreviewBuildingId(building.id)
+                      : chooseBuilding(building.id)
+                  }
+                  aria-pressed={
+                    entryMode === "moving"
+                      ? previewBuildingId === building.id
+                      : undefined
+                  }
+                  className={`group rounded-3xl border bg-white p-6 text-left transition hover:border-forest hover:shadow-lg ${previewBuildingId === building.id && entryMode === "moving" ? "border-forest" : "border-stroke"}`}
                 >
                   <span className={eyebrow}>
                     {building.units} homes · {building.periodLabel}
@@ -688,6 +777,62 @@ export function SharecheckApp() {
                 </button>
               ))}
             </div>
+            {entryMode === "moving" && previewBuilding && (
+              <section className={`${panel} mt-5`} aria-live="polite">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className={eyebrow}>Moving preview · synthetic</span>
+                    <h2 className="mt-2 font-display text-2xl font-bold">
+                      {previewBuilding.name}
+                    </h2>
+                  </div>
+                  <span className="rounded-full bg-mist px-3 py-1 text-xs font-semibold text-forest">
+                    6 sample households
+                  </span>
+                </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  {demoHistory(previewBuilding).map((month) => (
+                    <div
+                      key={month.period}
+                      className="rounded-2xl border border-stroke p-4"
+                    >
+                      <span className={eyebrow}>{month.label} 2026</span>
+                      <strong className="mt-2 block font-display text-lg">
+                        {month.flaggedCount
+                          ? `${month.flaggedCount} flagged`
+                          : "No mismatch found"}
+                      </strong>
+                      <span className="mt-1 block text-xs text-muted">
+                        {month.households} statements ·{" "}
+                        {formatMoney(month.consensusCents)} pool
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs leading-5 text-muted">
+                  Sample history shows calculation differences, not whether a
+                  building is fair or what a future bill will be.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSavedBuilding(previewBuilding.id)}
+                    className={secondary}
+                  >
+                    {savedBuildingId === previewBuilding.id
+                      ? "Remove saved building"
+                      : "Save this building"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => chooseBuilding(previewBuilding.id)}
+                    className={primary}
+                  >
+                    Check a bill <ArrowRight size={16} />
+                  </button>
+                </div>
+              </section>
+            )}
             <button
               type="button"
               onClick={() => chooseBuilding("other")}
@@ -702,12 +847,12 @@ export function SharecheckApp() {
           <section className={`${panel} no-print mx-auto max-w-2xl`}>
             <span className={eyebrow}>Your building</span>
             <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">
-              No shared data yet
+              {entryMode === "moving" ? "No history yet" : "No shared data yet"}
             </h1>
             <p className="mt-5 text-sm leading-6 text-muted">
               An unlisted building has no shared statements here. A comparison
               needs at least three from the same building and month. This demo
-              does not save submissions or send alerts.
+              does not save bill submissions or send alerts.
             </p>
             <div className="mt-6 rounded-2xl bg-mist p-4 text-xs leading-5 text-forest">
               For real alerts, the live service would need a private database,
