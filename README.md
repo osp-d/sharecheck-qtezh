@@ -1,101 +1,55 @@
 # SHARECHECK
 
-**Your neighbours’ bills are the evidence.**
+**Check whether your share of a building's water bill adds up.**
 
-### [Open the live SHARECHECK prototype →](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site)
+[Open the live demo](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site) · [Download a test statement PDF](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site/samples/maple-court-statement.pdf)
 
-Public web demo · No sign-up · Synthetic data
+SHARECHECK helps a renter compare a water charge with other households in the same building. It estimates the expected charge from the building's allocation rule, flags a difference worth asking about, and prepares an editable request to the property manager. The demo works in a browser without an account. **Every building and neighbour statement in it is fictional.**
 
-Sample upload: [download the Maple Court test statement PDF](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site/samples/maple-court-statement.pdf). In the site, choose **Maple Court → Statement → Choose PDF**, then confirm the extracted figures.
+## Try it
 
-A clickable, browser-only prototype for checking how an apartment building allocates a shared water bill. Start by choosing one of four fictional buildings. An unlisted building shows an honest no-data state. All resident records shipped with this demo are synthetic.
+1. Choose **Maple Court Apartments** and confirm the sample statement. To test upload, download the PDF above and select **Choose PDF** on the Statement screen.
+2. Continue through **Formula** and **Building room**. Add the synthetic neighbours, then run the check.
+3. Open the report. The proposed price is **$4.99 once**; enter the visible code `DEMO100` in the demo checkout to bring the total to **$0** and unlock it. No payment is taken.
 
-The interface uses **Tailwind CSS v4** with a small theme and print stylesheet in `src/app/globals.css`.
+In the Maple Court example, a **$112.50** water charge is compared with a **$90.00** estimate, a **$22.50** difference. The **$3.95** billing fee is separate. Change the inputs and the calculation changes with them.
 
-## Run
+You can also choose **Moving** to inspect three months of calculated sample history before considering a building. Saving a building makes it easy to reopen in the same browser. **My building is not listed** shows an empty state with no invented result.
 
-Node.js 22.13 or later is required. Use the committed lockfile.
+## What the prototype includes
+
+- Four fictional buildings with distinct allocation rules and six sample statements each. Three example charges are flagged; one is consistent.
+- Editable bill details, an optional local PDF upload, formula inference, a building comparison, a master-bill cross-check, and a vacancy scenario.
+- A report with the calculation, evidence counts, editable personal and building letters, print-to-PDF, and a verification code.
+- A working demo checkout and a browser-local saved-building feature.
+
+The comparison identifies a **calculation discrepancy**, not proof of unfair or unlawful billing. A small agreeing sample cannot verify the building's actual utility cost. The report explains these limits.
+
+## Demo limits
+
+This is a browser-only prototype. It does not collect card details, charge money, create accounts, receive live neighbour submissions, or send notifications. Uploads are read locally. Bill edits disappear on refresh; only a saved fictional building ID is kept in this browser and can be removed. The moving history is synthetic and does not update from real residents.
+
+The current complete flow is for **water**. Sewer and trash may reuse the allocation approach when a building divides a shared charge, but each needs its own rule and statements. Individually metered electricity needs a separate model.
+
+Real shared data, alerts, and payments would need a backend with building membership checks, private storage, consent, safe publication thresholds, and a payment provider. See [Architecture](docs/ARCHITECTURE.md) and the [FAQ audit](docs/FAQ_REQUIREMENTS.md). The team must still submit the required English PDF pitch deck separately.
+
+## Technical notes
+
+The app uses Next.js, React, TypeScript, and **Tailwind CSS v4**. It exports a static site to `out/`; the public demo needs no server or API keys. PDF text extraction uses PDF.js in the browser. The source is [public on GitHub](https://github.com/osp-d/sharecheck-qtezh).
+
+Requires Node.js 22.13 or later:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`. No account, credentials, database, or AI service is needed.
+Open `http://localhost:3000`. To verify and build:
 
 ```sh
-npm test             # Calculation and conservative text-parser tests
-npm run typecheck    # Strict TypeScript
-npm run build        # Production static export in out/
+npm run check
 ```
 
-The PDF worker is copied from the installed `pdfjs-dist` package by the build setup script; it is not a separately versioned dependency.
+For another static host, run `npm run build` and serve the generated `out/` directory at the domain root. The app's PDF worker is copied from the installed PDF.js package during the build.
 
-## What works
-
-- Building chooser → statement → formula → room → result → report; separate report verification screen.
-- Four synthetic buildings with six statements each: Maple Court (area and occupants), Birch Gardens (equal split), Riverstone Lofts (area), and Cedar Point (bedrooms). Three sample viewers have flagged differences; Riverstone's sample viewer is consistent.
-- Unlisted-building state with no invented comparison or notification signup.
-- Moving preview: three synthetic months per listed building, calculated from month-specific statements; save one building for a later visit in this browser.
-- Editable financial inputs and weighted square-foot, occupant, bedroom, and unit formulas.
-- Browser-local text-PDF extraction, with file-size/page limits and manual fallback. This is deterministic extraction, not AI or OCR. Review is mandatory.
-- Building median check, >2% outlier threshold, three-household minimum, and optional master-bill cross-check.
-- Formula Detective: infers a likely charge rule from 4+ participating bills, including ambiguity and insufficient-data states.
-- Vacancy Shift Check: compares the eligible master-bill pool with observed charges; includes a clearly marked shifted-vacancy simulation.
-- Bill-change explanation: a modeled November statement decomposed into building pool, share, fee, and off-formula change. Displayed cents reconcile.
-- Anonymous building letter, in addition to the editable personal manager letter.
-- Deterministic report code and a paste-and-verify JSON bundle. The bundle contains the viewer's row and a fingerprint of the synthetic cohort, not neighbour rows.
-- Synthetic neighbours added only after explicit demo participation consent.
-- Own statement and aggregate results only; other residents’ rows are never rendered.
-- Evidence provenance, a $4.99 one-time report gate with a simulated checkout. Enter the visible `DEMO100` code for a $0 total, complete the demo order, then open editable letters and print-to-PDF. No payment is taken.
-- Session reset and withdrawal of demo participation.
-
-Maple Court example: **$112.50** utility charge, **$90.00** consensus estimate, **$22.50** difference, **25%** above consensus. The **$3.95** fee is separate. A $2,400 master bill less 10% supports the $2,160 building pool. All amounts are fictional.
-
-## Deliberate boundaries
-
-This is a **single-browser demo**, not a live resident service. Refresh clears bill edits and the current selection. Only a saved building ID persists in this browser's localStorage; it can be removed in the Moving view. No bill or contact details are persisted. Invitation links open independent synthetic sessions. Evidence counts for neighbours are simulated fixture metadata; no documents are authenticated. There is no live database, cross-device history, email, payments, subscriptions, scheduled monitoring, OCR, or LLM integration. The moving history is fictional and stays the same until the demo code changes. The downloadable PDF statement and master bill are Maple Court examples only; other building figures are prefilled synthetic inputs.
-
-The checkout is a local demonstration of the price and access gate. It collects no card number and issues no real payment or purchase. A live paid version would need a payment-provider account, server-side checkout session creation, a verified payment webhook, durable entitlement storage, and refund/support procedures.
-
-The current core is water. Sewer and trash could reuse the shared-cost engine when a building actually allocates them from a common pool, but each needs a separate utility-specific cohort and rule. Individually metered electricity needs a different comparison model and is outside this demo.
-
-For a real "notify me when my building has enough data" flow, collect an email address only after explicit opt-in and a privacy notice. A backend must store a verified building ID, consent, and the contact address separately from submissions, count eligible distinct households by building and month, and send a single threshold alert through an email provider. Residents need a way to unsubscribe and delete their contact data. Publish comparisons only after a privacy threshold chosen for a real pilot; the demo's three-household calculation minimum is not a safe release threshold.
-
-Use synthetic information. Files are parsed in the browser and are not uploaded. The complete seed dataset exists in the client bundle: this is appropriate only for synthetic fixtures, never real submissions. Hiding rows in the UI is not a production access-control mechanism.
-
-Report codes detect changes to the included snapshot. They do not authenticate bills, prove that a building formula is lawful, or let a third party reproduce private neighbour entries. Formula and vacancy findings are patterns to investigate, not legal conclusions.
-
-## Deploy
-
-Public demo: [SHARECHECK](https://sharecheck-business-cup-2026.loosephlox32.chatgpt.site). No sign-up is required.
-
-The app uses a Next.js static export so the demo can be hosted without a backend.
-
-For Vercel: import this directory as the repository root, use Next.js, run `npm run build`, and set the output directory to `out`. Alternatively, upload the contents of `out/` to a static host. All links and assets assume hosting at the domain root. `npm run start` is not used for a static export.
-
-The source repository is [public on GitHub](https://github.com/osp-d/sharecheck-qtezh). Hosting the static `out/` directory requires no backend or API keys. See [the release checklist](docs/IMPLEMENTATION_PLAN.md#release-checklist) before sharing with judges.
-
-## Project map
-
-```text
-src/lib/audit.ts                 Pure calculation engine and validation
-src/lib/insights.ts              Formula, vacancy, change, letter, and code functions
-src/lib/demo.ts                  Clearly synthetic fixtures
-src/lib/statement-parser.ts      Conservative PDF field extraction
-src/lib/report.ts                Manager-request generation
-src/lib/checkout.ts              Demo price and access-code calculation
-src/components/sharecheck-app.tsx Journey state and screens
-src/components/insights-panels.tsx Insight and verification screens
-src/components/report-view.tsx   Calculation, letter, and printable report
-src/app/globals.css              Tailwind import, theme, fonts, print rules
-postcss.config.mjs               Tailwind PostCSS integration
-public/samples/                  Synthetic statement, addendum, master bill
-tests/                          Independent arithmetic and parsing cases
-docs/IMPLEMENTATION_PLAN.md      Scope, milestones, acceptance, release checks
-docs/ARCHITECTURE.md             Decisions, privacy model, production design
-docs/DEMO_SCRIPT.md              Two-minute judge walkthrough
-docs/FAQ_REQUIREMENTS.md         Case FAQ audit and submission gap
-```
-
-Financial calculations and document organisation, not legal advice.
+For more detail, see the [two-minute walkthrough](docs/DEMO_SCRIPT.md), [architecture](docs/ARCHITECTURE.md), and [case FAQ audit](docs/FAQ_REQUIREMENTS.md).
